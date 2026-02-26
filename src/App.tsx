@@ -1,11 +1,12 @@
-import { useState, useCallback } from 'react';
-import { Settings, GraduationCap, Layers } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
+import { Settings, GraduationCap, Layers, History } from 'lucide-react';
 import { useSettings } from './hooks/useSettings';
 import SettingsModal from './components/SettingsModal';
 import PhotoUploader from './components/PhotoUploader';
 import VariationCard from './components/VariationCard';
 import StudentModule from './components/StudentModule';
 import BatchDownload from './components/BatchDownload';
+import HistoryModal from './components/HistoryModal';
 import {
   startGeneration,
   pollResult,
@@ -14,7 +15,14 @@ import {
 } from './lib/bfl-client';
 import { VARIATION_DEFINITIONS } from './lib/variations';
 import { buildPrompt } from './lib/prompt-builder';
-import { saveSession } from './lib/storage';
+import {
+  saveSession,
+  saveSourceBlob,
+  saveImageBlob,
+  loadImageBlobUrl,
+  loadSourceBlobUrl,
+  loadSessions,
+} from './lib/storage';
 import PromptConfig from './components/PromptConfig';
 import type { Session, GeneratedVariation, AppView, PromptParams } from './types';
 import { MODEL_COST_USD } from './types';
@@ -26,7 +34,8 @@ function generateId() {
 export default function App() {
   const { settings, updateSettings, loaded } = useSettings();
   const [showSettings, setShowSettings] = useState(false);
-  const [view, setView] = useState<AppView>('upload');
+  const [showHistory, setShowHistory]   = useState(false);
+  const [view, setView]     = useState<AppView>('upload');
   const [session, setSession] = useState<Session | null>(null);
   const [promptParams, setPromptParams] = useState<PromptParams>({
     environment: 'general',
@@ -34,6 +43,43 @@ export default function App() {
     photoStyle: 'match-source',
     sceneDescription: '',
   });
+
+  // ── Restore last in-progress session on mount ────────────────────────────
+  useEffect(() => {
+    if (!loaded) return;
+    (async () => {
+      const sessions = await loadSessions();
+      const last = sessions[0];
+      if (!last) return;
+
+      // Restore blob URLs for any completed variations
+      const restoredVariations = await Promise.all(
+        last.variations.map(async (v) => {
+          if (v.status === 'done' && !v.blobUrl) {
+            const blobUrl = await loadImageBlobUrl(v.id);
+            return blobUrl ? { ...v, blobUrl } : v;
+          }
+          // Mark any pending/polling variations as errored (they can't resume)
+          if (v.status === 'pending' || v.status === 'polling') {
+            return { ...v, status: 'error' as const, error: 'Interrupted — please regenerate' };
+          }
+          return v;
+        })
+      );
+
+      // Restore source image blob URL
+      const sourceUrl = await loadSourceBlobUrl(last.id);
+
+      const restored: Session = {
+        ...last,
+        sourceImageUrl: sourceUrl ?? last.sourceImageUrl,
+        variations: restoredVariations,
+      };
+
+      setSession(restored);
+      setView('generating');
+    })();
+  }, [loaded]);
 
   const updateVariation = useCallback(
     (sessionId: string, variationId: string, updates: Partial<GeneratedVariation>) => {
@@ -62,7 +108,6 @@ export default function App() {
           variation.config,
           seed
         );
-        // cost is in credits (1 credit = $0.01 USD)
         updateVariation(sess.id, variation.id, {
           status: 'polling',
           pollingUrl: polling_url,
@@ -75,7 +120,9 @@ export default function App() {
           const result = await pollResult(settings.apiKey, polling_url);
 
           if (result.status === 'Ready' && result.result?.sample) {
-            const blobUrl = await downloadImageAsBlob(result.result.sample);
+            const { blobUrl, blob } = await downloadImageAsBlob(result.result.sample);
+            // Persist blob to IndexedDB so it survives page close
+            await saveImageBlob(variation.id, blob);
             updateVariation(sess.id, variation.id, {
               status: 'done',
               imageUrl: result.result.sample,
@@ -130,13 +177,15 @@ export default function App() {
       setSession(sess);
       setView('generating');
 
+      // Persist source image blob so it survives page close
+      await saveSourceBlob(sess.id, file);
+      await saveSession(sess);
+
       const base64 = await toBase64(file);
-
       await Promise.all(variations.map((v) => generateVariation(sess, v, base64)));
-
       await saveSession(sess);
     },
-    [settings.apiKey, generateVariation]
+    [settings, promptParams, generateVariation]
   );
 
   const handleRegenerate = useCallback(
@@ -154,6 +203,27 @@ export default function App() {
     },
     [session, generateVariation]
   );
+
+  const handleRestoreSession = useCallback(async (restored: Session) => {
+    // Restore blob URLs from IndexedDB
+    const withBlobs = await Promise.all(
+      restored.variations.map(async (v) => {
+        if (v.status === 'done' && !v.blobUrl) {
+          const blobUrl = await loadImageBlobUrl(v.id);
+          return blobUrl ? { ...v, blobUrl } : v;
+        }
+        return v;
+      })
+    );
+    const sourceUrl = await loadSourceBlobUrl(restored.id);
+    setSession({
+      ...restored,
+      sourceImageUrl: sourceUrl ?? restored.sourceImageUrl,
+      variations: withBlobs,
+    });
+    setView('generating');
+    setShowHistory(false);
+  }, []);
 
   const allDone = session?.variations.every(
     (v) => v.status === 'done' || v.status === 'error'
@@ -193,15 +263,20 @@ export default function App() {
             )}
             {session && (
               <button
-                onClick={() => {
-                  setSession(null);
-                  setView('upload');
-                }}
+                onClick={() => { setSession(null); setView('upload'); }}
                 className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"
               >
                 New Session
               </button>
             )}
+            <button
+              onClick={() => setShowHistory(true)}
+              className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"
+              title="Generation history"
+            >
+              <History size={15} />
+              History
+            </button>
             <button
               onClick={() => setShowSettings(true)}
               className={`p-2 rounded-lg transition-colors ${
@@ -226,10 +301,7 @@ export default function App() {
               <p className="text-amber-300 text-sm font-medium">API key required</p>
               <p className="text-amber-300/70 text-sm mt-0.5">
                 Add your BFL API key in settings to start generating variations.{' '}
-                <button
-                  onClick={() => setShowSettings(true)}
-                  className="underline hover:text-amber-200"
-                >
+                <button onClick={() => setShowSettings(true)} className="underline hover:text-amber-200">
                   Open Settings →
                 </button>
               </p>
@@ -242,15 +314,11 @@ export default function App() {
             <div className="mb-8 text-center">
               <h2 className="text-2xl font-bold text-white">Generate Training Set</h2>
               <p className="text-gray-400 mt-2 text-sm max-w-md mx-auto">
-                Upload a Hub environment photo and AI will generate 3 photorealistic variations
-                for spot-the-difference observational training.
+                Upload a Hub environment photo and AI will generate variations
+                for observational training.
               </p>
             </div>
-            <PromptConfig
-              params={promptParams}
-              model={settings.model}
-              onChange={setPromptParams}
-            />
+            <PromptConfig params={promptParams} model={settings.model} onChange={setPromptParams} />
             <PhotoUploader onFileSelected={handlePhotoSelected} />
           </div>
         )}
@@ -265,36 +333,28 @@ export default function App() {
                 <p className="text-gray-400 text-sm mt-1">
                   {allDone
                     ? 'Review the variations below. Download or regenerate as needed.'
-                    : 'AI is generating 3 variations in parallel. Each takes up to 60 seconds.'}
+                    : 'AI is generating variations in parallel. Each takes up to 60 seconds.'}
                 </p>
               </div>
-              {/* Session cost estimate */}
               <div className="shrink-0 text-right">
                 <p className="text-xs text-gray-500">Est. session cost</p>
                 <p className="text-sm font-mono font-semibold text-amber-300">
-                  ~${(MODEL_COST_USD[settings.model] * 3).toFixed(3)}
+                  ~${(MODEL_COST_USD[settings.model] * session.variations.length).toFixed(3)}
                 </p>
                 <p className="text-xs text-gray-600">{settings.model}</p>
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Source image */}
               <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
                 <div className="aspect-video bg-gray-900">
-                  <img
-                    src={session.sourceImageUrl}
-                    alt="Source"
-                    className="w-full h-full object-cover"
-                  />
+                  <img src={session.sourceImageUrl} alt="Source" className="w-full h-full object-cover" />
                 </div>
                 <div className="p-3">
                   <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-indigo-300">
                     ORIGINAL
                   </span>
-                  <p className="text-white text-sm font-medium mt-1 truncate">
-                    {session.sourceImageName}
-                  </p>
+                  <p className="text-white text-sm font-medium mt-1 truncate">{session.sourceImageName}</p>
                 </div>
               </div>
 
@@ -322,11 +382,10 @@ export default function App() {
       </main>
 
       {showSettings && (
-        <SettingsModal
-          settings={settings}
-          onSave={updateSettings}
-          onClose={() => setShowSettings(false)}
-        />
+        <SettingsModal settings={settings} onSave={updateSettings} onClose={() => setShowSettings(false)} />
+      )}
+      {showHistory && (
+        <HistoryModal onRestore={handleRestoreSession} onClose={() => setShowHistory(false)} />
       )}
     </div>
   );

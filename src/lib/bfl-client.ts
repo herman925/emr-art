@@ -168,7 +168,7 @@ export async function pollResult(
   return response.json();
 }
 
-export async function downloadImageAsBlob(url: string): Promise<string> {
+export async function downloadImageAsBlob(url: string): Promise<{ blobUrl: string; blob: Blob }> {
   // The result image is on Azure Blob Storage (bfldelivery*.blob.core.windows.net)
   // which also lacks CORS headers — route through our proxy the same way.
   const target     = new URL(url);
@@ -180,7 +180,7 @@ export async function downloadImageAsBlob(url: string): Promise<string> {
   });
   if (!response.ok) throw new Error('Failed to download image');
   const blob = await response.blob();
-  return URL.createObjectURL(blob);
+  return { blob, blobUrl: URL.createObjectURL(blob) };
 }
 
 export interface BFLCreditsResponse {
