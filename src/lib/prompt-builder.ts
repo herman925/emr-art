@@ -35,7 +35,11 @@ const STYLE_DESCRIPTOR: Record<PhotoStyle, string> = {
   'match-source':        'photographic style, exposure, and colour temperature matching the reference image exactly',
   'modern-digital':      'shot on Sony A7IV, 24-70mm at 35mm, clean sharp, high dynamic range, modern digital photography',
   'natural-light':       'soft natural window light, warm and inviting, early childhood setting documentary photography',
-  'indoor-fluorescent':  'indoor overhead lighting, crisp detail, high-fidelity early childhood environment documentation',
+  'indoor-fluorescent':  'indoor overhead fluorescent lighting, crisp detail, high-fidelity early childhood environment documentation',
+  'warm-golden-hour':    'warm golden-hour light streaming through windows, rich amber tones, cosy and welcoming atmosphere',
+  'overcast-soft':       'overcast daylight through large windows, even diffused light, no harsh shadows, calm and neutral tones',
+  'bright-airy':         'very bright, airy and spacious feel, white-balanced, Scandinavian-inspired clean aesthetic, high key',
+  'high-contrast':       'bold dramatic contrast, deep shadows and bright highlights, editorial documentary style photography',
 };
 
 /**
@@ -48,31 +52,48 @@ const STYLE_DESCRIPTOR: Record<PhotoStyle, string> = {
  *     floor markings added, different equipment beside it
  * That gap is the target for the upper end of this scale.
  */
-const INTENSITY_CHANGE: Record<ChangeIntensity, { label: string; instruction: string }> = {
+const INTENSITY_CHANGE: Record<ChangeIntensity, { label: string; icon: string; instruction: string }> = {
   minimal: {
     label: 'Noticeable',
+    icon: '🔵',
     instruction:
       'Keep the same corner setup and theme but change several visible details: alter the colours of key props, swap some decorations, add or remove a few items from shelves or surfaces. The overall setup looks recognisably similar but a careful observer notices clear differences.',
   },
   subtle: {
     label: 'Significant',
+    icon: '🟢',
     instruction:
       'The corner setup is visibly re-dressed: the main prop or installation has a noticeably different appearance (different colour scheme, different decorations, more or less elaborately finished), background shelves and wall displays have different contents, and some additional or removed equipment changes the overall arrangement. Same theme, but set up differently.',
   },
   moderate: {
     label: 'Dramatic',
+    icon: '🟡',
     instruction:
       'The corner looks like it was completely rebuilt or re-decorated by a different person. The main installation or props have a substantially different visual style, finish, and colour palette. Wall displays, floor markings, and surrounding equipment are all different. The corner theme may be the same broad category but everything about its physical presentation is new.',
   },
+  vivid: {
+    label: 'Striking',
+    icon: '🟠',
+    instruction:
+      'The corner has undergone a bold transformation. The primary installation or focal piece is dramatically reimagined — different form, material, and colour story. Every surface (floor, walls, shelves, ceiling hangings) contributes to a fresh visual identity. The corner is clearly the same type of space but feels like a completely different setup done by a creative educator with a strong new vision.',
+  },
   obvious: {
     label: 'Extreme',
+    icon: '🔴',
     instruction:
       'The corner has been entirely reimagined. While the room structure and camera angle are identical, the corner setup inside looks completely different — different theme or sub-theme, different props, different colours, different layout of furniture and equipment within the space. Like a fully different corner activity station has been installed in the same room.',
   },
+  sweeping: {
+    label: 'Sweeping',
+    icon: '🟣',
+    instruction:
+      'Transform the entire interior so aggressively that only an expert could identify it as the same physical room. Replace every item — main structures, all furniture pieces, all props, all wall coverings, all floor elements. Introduce a radically different colour palette, a different activity theme, and a different spatial organisation. The only connection to the source image should be the architectural shell and camera position.',
+  },
   major: {
     label: 'Total',
+    icon: '⚫',
     instruction:
-      'Completely replace everything inside the room with a totally different activity corner setup. Different theme, different furniture, different props, different wall decorations, different floor use. Only the room shell (walls, ceiling, floor surface, windows) and exact camera angle remain. The interior should be unrecognisable compared to the reference.',
+      'Completely replace everything inside the room with a totally different activity corner setup. Different theme, different furniture, different props, different wall decorations, different floor use. Only the room shell (walls, ceiling, floor surface, windows) and exact camera angle remain. The interior should be unrecognisable compared to the reference — as if an entirely different Hub corner was built inside the same four walls.',
   },
 };
 

@@ -26,100 +26,98 @@ const ENVIRONMENTS: { value: EnvironmentType; label: string; emoji: string }[] =
 ];
 
 const PHOTO_STYLES: { value: PhotoStyle; label: string; desc: string }[] = [
-  { value: 'match-source',       label: 'Match Source',       desc: 'Infer style from your photo' },
-  { value: 'modern-digital',     label: 'Modern Digital',     desc: 'Sony A7IV · sharp · HDR' },
-  { value: 'natural-light',      label: 'Natural Light',      desc: 'Soft window · organic tones' },
-  { value: 'indoor-fluorescent', label: 'Fluorescent Indoor', desc: 'Office lighting · crisp detail' },
+  { value: 'match-source',       label: 'Match Source',        desc: 'Infer style from your photo' },
+  { value: 'modern-digital',     label: 'Modern Digital',      desc: 'Sony A7IV · sharp · HDR' },
+  { value: 'natural-light',      label: 'Natural Light',       desc: 'Soft window · organic tones' },
+  { value: 'indoor-fluorescent', label: 'Fluorescent Indoor',  desc: 'Office lighting · crisp detail' },
+  { value: 'warm-golden-hour',   label: 'Golden Hour',         desc: 'Warm amber · cosy windows' },
+  { value: 'overcast-soft',      label: 'Overcast Soft',       desc: 'Even diffused · no harsh shadows' },
+  { value: 'bright-airy',        label: 'Bright & Airy',       desc: 'High-key · Scandi clean' },
+  { value: 'high-contrast',      label: 'High Contrast',       desc: 'Editorial · bold shadows' },
 ];
-
-const INTENSITY_COLORS: Record<ChangeIntensity, string> = {
-  minimal:  'bg-sky-500/20    border-sky-500    text-sky-300',
-  subtle:   'bg-green-500/20  border-green-500  text-green-300',
-  moderate: 'bg-amber-500/20  border-amber-500  text-amber-300',
-  obvious:  'bg-orange-500/20 border-orange-500 text-orange-300',
-  major:    'bg-red-500/20    border-red-500    text-red-300',
-};
 
 export default function PromptConfig({ params, model, onChange, variationCount, onVariationCountChange }: Props) {
   const costPerVariation = MODEL_COST_USD[model];
   const costPerPhoto     = costPerVariation * variationCount;
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+
+  const selectedEnv = ENVIRONMENTS.find((e) => e.value === params.environment)!;
 
   return (
     <div className="w-full mb-4">
       {/* Header toggle */}
       <button
         onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-gray-800/80 border border-gray-700 rounded-xl hover:border-gray-600 transition-colors group"
+        className="w-full flex items-center justify-between px-4 py-3 bg-gray-800/80 border border-gray-700 rounded-xl hover:border-gray-600 transition-colors"
       >
-        <div className="flex items-center gap-2">
-          <Wand2 size={15} className="text-indigo-400" />
-          <span className="text-sm font-medium text-white">Prompt Configuration</span>
+        <div className="flex items-center gap-2.5">
+          <Wand2 size={16} className="text-indigo-400 shrink-0" />
+          <span className="text-sm font-semibold text-white">Prompt Configuration</span>
           {/* Summary pills when collapsed */}
           {!expanded && (
-            <div className="flex items-center gap-1.5 ml-2">
-              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400 capitalize">
-                {params.environment}
+            <div className="flex items-center gap-1.5 ml-1">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-300">
+                {selectedEnv.emoji} {selectedEnv.label}
               </span>
-              <span className={`text-xs px-2 py-0.5 rounded-full border ${INTENSITY_COLORS[params.intensity]}`}>
-                {INTENSITY_META[params.intensity].label}
+              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-300">
+                {INTENSITY_META[params.intensity].icon} {INTENSITY_META[params.intensity].label}
               </span>
             </div>
           )}
         </div>
         {expanded ? (
-          <ChevronUp size={15} className="text-gray-400" />
+          <ChevronUp size={15} className="text-gray-400 shrink-0" />
         ) : (
-          <ChevronDown size={15} className="text-gray-400" />
+          <ChevronDown size={15} className="text-gray-400 shrink-0" />
         )}
       </button>
 
       {expanded && (
         <div className="mt-2 bg-gray-800/60 border border-gray-700 rounded-xl p-4 space-y-5">
 
-          {/* Environment */}
+          {/* Environment — dropdown */}
           <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
               Environment Type
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {ENVIRONMENTS.map((e) => (
-                <button
-                  key={e.value}
-                  onClick={() => onChange({ ...params, environment: e.value })}
-                  className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-                    params.environment === e.value
-                      ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200'
-                      : 'bg-gray-700/50 border-gray-600 text-gray-400 hover:border-gray-500 hover:text-gray-300'
-                  }`}
-                >
-                  {e.emoji} {e.label}
-                </button>
-              ))}
+            </label>
+            <div className="relative">
+              <select
+                value={params.environment}
+                onChange={(e) => onChange({ ...params, environment: e.target.value as EnvironmentType })}
+                className="w-full appearance-none bg-gray-900 border border-gray-600 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
+              >
+                {ENVIRONMENTS.map((e) => (
+                  <option key={e.value} value={e.value}>
+                    {e.emoji}  {e.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
             </div>
           </div>
 
-          {/* Change intensity */}
+          {/* Change intensity — icon buttons */}
           <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
               Change Intensity
-            </p>
-            <div className="flex flex-col gap-1.5">
-              {(Object.entries(INTENSITY_META) as [ChangeIntensity, { label: string; instruction: string }][]).map(([value, meta]) => (
+            </label>
+            <div className="grid grid-cols-1 gap-1.5">
+              {(Object.entries(INTENSITY_META) as [ChangeIntensity, { label: string; icon: string; instruction: string }][]).map(([value, meta]) => (
                 <button
                   key={value}
                   onClick={() => onChange({ ...params, intensity: value })}
-                  className={`text-left px-3 py-2.5 rounded-lg border transition-colors ${
+                  className={`text-left px-3 py-2.5 rounded-lg border transition-colors flex items-start gap-2.5 ${
                     params.intensity === value
-                      ? INTENSITY_COLORS[value]
-                      : 'bg-gray-700/50 border-gray-600 text-gray-400 hover:border-gray-500'
+                      ? 'bg-indigo-600/20 border-indigo-500 text-white'
+                      : 'bg-gray-700/40 border-gray-600 text-gray-400 hover:border-gray-500 hover:text-gray-200'
                   }`}
                 >
-                  <p className="text-sm font-medium">{meta.label}</p>
-                  <p className="text-[10px] mt-0.5 opacity-70 leading-tight line-clamp-2">
-                    {meta.instruction}
-                  </p>
+                  <span className="text-base leading-none mt-0.5 shrink-0">{meta.icon}</span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold leading-none">{meta.label}</p>
+                    <p className="text-[11px] mt-1 opacity-60 leading-snug line-clamp-2">{meta.instruction}</p>
+                  </div>
                 </button>
               ))}
             </div>
@@ -127,40 +125,38 @@ export default function PromptConfig({ params, model, onChange, variationCount, 
 
           {/* Scene description */}
           <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
               Scene Description
               <span className="ml-1.5 font-normal normal-case text-gray-600">— optional</span>
-            </p>
+            </label>
             <textarea
               value={params.sceneDescription}
               onChange={(e) => onChange({ ...params, sceneDescription: e.target.value })}
-              placeholder="e.g. ball pit, 45° wide angle, colourful foam mats, shelves on left wall"
+              placeholder="e.g. ball pit, 45 degree wide angle, colourful foam mats, shelves on left wall"
               rows={2}
-              className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 resize-none"
+              className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 resize-none"
             />
-            <p className="text-[10px] text-gray-600 mt-1">
-              Helps the AI understand your scene when generating variations.
-            </p>
+            <p className="text-xs text-gray-600 mt-1">Helps the AI understand your scene when generating variations.</p>
           </div>
 
           {/* Photo style */}
           <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
               Photo Style
-            </p>
+            </label>
             <div className="grid grid-cols-2 gap-1.5">
               {PHOTO_STYLES.map((s) => (
                 <button
                   key={s.value}
                   onClick={() => onChange({ ...params, photoStyle: s.value })}
-                  className={`text-left px-3 py-2 rounded-lg border transition-colors ${
+                  className={`text-left px-3 py-2.5 rounded-lg border transition-colors ${
                     params.photoStyle === s.value
                       ? 'bg-indigo-600/20 border-indigo-500 text-white'
-                      : 'bg-gray-700/50 border-gray-600 text-gray-400 hover:border-gray-500'
+                      : 'bg-gray-700/40 border-gray-600 text-gray-400 hover:border-gray-500 hover:text-gray-200'
                   }`}
                 >
-                  <p className="text-xs font-medium">{s.label}</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">{s.desc}</p>
+                  <p className="text-sm font-semibold leading-none">{s.label}</p>
+                  <p className="text-[11px] text-gray-500 mt-1 leading-snug">{s.desc}</p>
                 </button>
               ))}
             </div>
@@ -169,14 +165,12 @@ export default function PromptConfig({ params, model, onChange, variationCount, 
           {/* Variation count */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
                 Variations per Photo
-              </p>
+              </label>
               <div className="flex items-center gap-2">
-                <span className="text-lg font-mono font-bold text-indigo-300">{variationCount}</span>
-                <span className="text-xs text-gray-500 font-mono">
-                  ~${costPerPhoto.toFixed(3)}/photo
-                </span>
+                <span className="text-xl font-mono font-bold text-indigo-300">{variationCount}</span>
+                <span className="text-xs text-gray-500 font-mono">~${costPerPhoto.toFixed(3)}/photo</span>
               </div>
             </div>
             <input
@@ -188,35 +182,34 @@ export default function PromptConfig({ params, model, onChange, variationCount, 
               onChange={(e) => onVariationCountChange(parseInt(e.target.value))}
               className="w-full accent-indigo-500"
             />
-            <div className="flex justify-between text-[10px] text-gray-600 mt-0.5">
-              <span>1 (test)</span>
+            <div className="flex justify-between text-xs text-gray-600 mt-0.5">
+              <span>1</span>
               <span>10</span>
               <span>25</span>
-              <span>50 (bulk)</span>
+              <span>50</span>
             </div>
             {variationCount > 10 && (
-              <p className="text-[10px] text-amber-400/80 mt-1.5">
-                {variationCount} variations will use ~${costPerPhoto.toFixed(3)} per uploaded photo
+              <p className="text-xs text-amber-400/80 mt-1.5">
+                {variationCount} variations ≈ ${costPerPhoto.toFixed(3)} per uploaded photo
               </p>
             )}
           </div>
 
-          {/* Prompt preview toggle */}
+          {/* Prompt preview */}
           <div className="border-t border-gray-700 pt-4">
             <button
               onClick={() => setShowPreview((v) => !v)}
               className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors"
             >
               {showPreview ? <EyeOff size={13} /> : <Eye size={13} />}
-              {showPreview ? 'Hide prompt preview' : 'Preview prompts sent to API'}
+              {showPreview ? 'Hide prompt preview' : 'Preview prompt sent to API'}
             </button>
-
             {showPreview && (
               <div className="mt-3">
-                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                  Prompt sent to API (same for all 3 variations, different seeds)
+                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                  Prompt sent to API (same for all variations, different seeds)
                 </p>
-                <pre className="text-[10px] text-gray-300 bg-gray-900 border border-gray-700 rounded-lg p-3 whitespace-pre-wrap break-words leading-relaxed font-mono">
+                <pre className="text-[11px] text-gray-300 bg-gray-900 border border-gray-700 rounded-lg p-3 whitespace-pre-wrap break-words leading-relaxed font-mono max-h-48 overflow-y-auto">
                   {buildPromptPreview(params, model)}
                 </pre>
               </div>

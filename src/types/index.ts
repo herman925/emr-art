@@ -64,13 +64,24 @@ export type EnvironmentType =
   | 'music'          // Music corner
   | 'outdoor';       // Outdoor play area
 
-export type ChangeIntensity = 'minimal' | 'subtle' | 'moderate' | 'obvious' | 'major';
+export type ChangeIntensity =
+  | 'minimal'    // Noticeable
+  | 'subtle'     // Significant
+  | 'moderate'   // Dramatic
+  | 'vivid'      // Striking  (new — between Dramatic and Extreme)
+  | 'obvious'    // Extreme
+  | 'sweeping'   // Sweeping  (new — between Extreme and Total)
+  | 'major';     // Total
 
 export type PhotoStyle =
   | 'match-source'
   | 'modern-digital'
   | 'natural-light'
-  | 'indoor-fluorescent';
+  | 'indoor-fluorescent'
+  | 'warm-golden-hour'
+  | 'overcast-soft'
+  | 'bright-airy'
+  | 'high-contrast';
 
 export interface PromptParams {
   environment: EnvironmentType;

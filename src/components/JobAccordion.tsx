@@ -45,11 +45,11 @@ export default function JobAccordion({ session, onRegenerate, onStudentView, onR
 
         {/* Meta */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-white truncate">{session.sourceImageName}</p>
+          <p className="text-sm font-semibold text-white truncate">{session.sourceImageName}</p>
           <div className="flex items-center gap-2 mt-0.5">
-            <span className={`text-xs font-medium ${statusColor}`}>{statusLabel}</span>
-            <span className="text-xs text-gray-600">·</span>
-            <span className="text-xs text-gray-600">{total} variation{total !== 1 ? 's' : ''}</span>
+            <span className={`text-sm font-medium ${statusColor}`}>{statusLabel}</span>
+            <span className="text-sm text-gray-600">·</span>
+            <span className="text-sm text-gray-600">{total} variation{total !== 1 ? 's' : ''}</span>
           </div>
           {/* Progress bar */}
           <div className="mt-1.5 h-1 bg-gray-700 rounded-full overflow-hidden w-full">

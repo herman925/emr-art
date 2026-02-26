@@ -233,7 +233,7 @@ export default function App() {
               <Layers size={18} />
             </div>
             <div>
-              <h1 className="text-base font-semibold text-white leading-none">EMR-ART</h1>
+              <h1 className="text-lg font-bold text-white leading-none">EMR-ART</h1>
               <p className="text-xs text-gray-400 mt-0.5">AI Observational Training</p>
             </div>
           </div>
@@ -263,20 +263,21 @@ export default function App() {
       {/* Two-panel body */}
       <div className="flex-1 flex overflow-hidden max-w-screen-xl mx-auto w-full">
 
-        {/* ── Left panel: config + upload ── */}
-        <aside className="w-80 shrink-0 border-r border-gray-800 flex flex-col overflow-y-auto">
-          <div className="p-5 space-y-4">
+        {/* ── Left panel: upload + config ── */}
+        <aside className="w-96 shrink-0 border-r border-gray-800 flex flex-col overflow-y-auto">
+          <div className="p-6 space-y-5">
+
             <div>
-              <h2 className="text-sm font-semibold text-white">Generate Training Set</h2>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Configure options, then upload photos to queue jobs.
+              <h2 className="text-base font-bold text-white">Generate Training Set</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Upload photos, configure options, and queue generation jobs.
               </p>
             </div>
 
             {!settings.apiKey && (
-              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 flex items-start gap-2">
-                <span className="text-amber-400 text-sm shrink-0">⚠</span>
-                <p className="text-amber-300/80 text-xs">
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3.5 flex items-start gap-2.5">
+                <span className="text-amber-400 shrink-0">⚠</span>
+                <p className="text-sm text-amber-300/80">
                   API key required.{' '}
                   <button onClick={() => setShowSettings(true)} className="underline hover:text-amber-200">
                     Open Settings
@@ -285,6 +286,10 @@ export default function App() {
               </div>
             )}
 
+            {/* Upload first */}
+            <PhotoUploader onFilesSelected={handleFilesSelected} />
+
+            {/* Config below, starts collapsed */}
             <PromptConfig
               params={promptParams}
               model={settings.model}
@@ -292,28 +297,31 @@ export default function App() {
               variationCount={variationCount}
               onVariationCountChange={setVariationCount}
             />
-
-            <PhotoUploader onFilesSelected={handleFilesSelected} />
           </div>
         </aside>
 
         {/* ── Right panel: jobs ── */}
-        <main className="flex-1 overflow-y-auto p-5">
+        <main className="flex-1 overflow-y-auto p-6">
           {sessions.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center gap-3 text-gray-600">
-              <Layers size={36} className="opacity-30" />
-              <p className="text-sm">No jobs yet.<br />Upload photos on the left to get started.</p>
-              <p className="text-xs opacity-60">Jobs are cleared on page refresh.<br />Use History to access saved sessions.</p>
+            <div className="h-full flex flex-col items-center justify-center text-center gap-4 text-gray-600">
+              <Layers size={40} className="opacity-20" />
+              <div>
+                <p className="text-base font-medium text-gray-500">No active jobs</p>
+                <p className="text-sm text-gray-600 mt-1">Upload photos on the left to get started.</p>
+              </div>
+              <p className="text-xs text-gray-700 mt-1">
+                Jobs clear on page refresh — use History for saved sessions.
+              </p>
             </div>
           ) : (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
                   Active Jobs — {sessions.length}
                 </h3>
                 <button
                   onClick={() => setSessions([])}
-                  className="text-xs text-gray-600 hover:text-red-400 transition-colors"
+                  className="text-sm text-gray-600 hover:text-red-400 transition-colors"
                 >
                   Clear all
                 </button>
