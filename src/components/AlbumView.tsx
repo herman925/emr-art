@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Check, ThumbsDown, Star, Images, SlidersHorizontal, X } from 'lucide-react';
+import { Check, ThumbsDown, Star, Images, SlidersHorizontal, X, Search, Group } from 'lucide-react';
 import type { Session, VariationFlag, EnvironmentType, ChangeIntensity, PhotoStyle } from '../types';
 import AlbumLightbox, { type AlbumItem } from './AlbumLightbox';
 import { INTENSITY_META, ENV_DISPLAY } from '../lib/prompt-builder';
@@ -12,11 +12,12 @@ interface Props {
 
 type FlagFilter   = 'all' | 'accepted' | 'rejected' | 'unreviewed';
 type StarOperator = '>'  | '>=' | '=' | '<=' | '<';
+type GroupBy      = 'none' | 'source' | 'environment' | 'intensity' | 'flag' | 'stars';
 
 interface Filters {
   flag:        FlagFilter;
-  starOp:      StarOperator | null;   // null = no star filter
-  starValue:   number;                // 1–5
+  starOp:      StarOperator | null;
+  starValue:   number;
   environment: EnvironmentType | 'all';
   intensity:   ChangeIntensity  | 'all';
   photoStyle:  PhotoStyle       | 'all';
@@ -33,6 +34,15 @@ const PHOTO_STYLE_LABELS: Record<PhotoStyle, string> = {
   'warm-golden-hour': 'Golden Hour', 'overcast-soft': 'Overcast',
   'bright-airy': 'Bright & Airy', 'high-contrast': 'High Contrast',
 };
+
+const GROUP_BY_OPTIONS: { value: GroupBy; label: string }[] = [
+  { value: 'none',        label: 'No Grouping'  },
+  { value: 'source',      label: 'Source Photo'  },
+  { value: 'environment', label: 'Environment'   },
+  { value: 'intensity',   label: 'Intensity'     },
+  { value: 'flag',        label: 'Review Status' },
+  { value: 'stars',       label: 'Star Rating'   },
+];
 
 function matchesStar(rating: number | undefined, op: StarOperator | null, value: number): boolean {
   if (!op) return true;
@@ -56,11 +66,76 @@ function countActive(f: Filters): number {
   return n;
 }
 
+function groupItems(items: AlbumItem[], groupBy: GroupBy): { label: string; items: AlbumItem[] }[] {
+  if (groupBy === 'none') return [{ label: '', items }];
+
+  const buckets = new Map<string, AlbumItem[]>();
+
+  for (const item of items) {
+    let key: string;
+    const p = item.session.promptParams;
+
+    switch (groupBy) {
+      case 'source':
+        key = item.session.sourceImageName;
+        break;
+      case 'environment': {
+        const env = p?.environment ?? 'general';
+        const meta = ENV_DISPLAY[env as EnvironmentType];
+        key = meta ? `${meta.emoji} ${meta.label}` : env;
+        break;
+      }
+      case 'intensity': {
+        const intens = p?.intensity ?? 'obvious';
+        const meta = INTENSITY_META[intens as ChangeIntensity];
+        key = meta ? `${meta.icon} ${meta.label}` : intens;
+        break;
+      }
+      case 'flag':
+        key = item.variation.flag === 'accepted'
+          ? '✓ Accepted'
+          : item.variation.flag === 'rejected'
+          ? '👎 Rejected'
+          : '— Unreviewed';
+        break;
+      case 'stars':
+        key = item.variation.rating
+          ? `${'★'.repeat(item.variation.rating)} ${item.variation.rating} star${item.variation.rating > 1 ? 's' : ''}`
+          : '☆ Unrated';
+        break;
+      default:
+        key = '';
+    }
+
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key)!.push(item);
+  }
+
+  // Sort buckets sensibly
+  const entries = [...buckets.entries()].map(([label, items]) => ({ label, items }));
+
+  if (groupBy === 'stars') {
+    entries.sort((a, b) => {
+      if (a.label === '☆ Unrated') return 1;
+      if (b.label === '☆ Unrated') return -1;
+      return b.label.localeCompare(a.label);
+    });
+  } else if (groupBy === 'flag') {
+    const order = ['✓ Accepted', '— Unreviewed', '👎 Rejected'];
+    entries.sort((a, b) => order.indexOf(a.label) - order.indexOf(b.label));
+  }
+
+  return entries;
+}
+
 export default function AlbumView({ sessions, onFlag, onRate }: Props) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
-  const [thumbSize, setThumbSize] = useState(200); // px min-width per cell
+  const [thumbSize, setThumbSize] = useState(200);
+  const [search, setSearch] = useState('');
+  const [groupBy, setGroupBy] = useState<GroupBy>('none');
+  const [showGroupMenu, setShowGroupMenu] = useState(false);
 
   const set = <K extends keyof Filters>(key: K, val: Filters[K]) =>
     setFilters((f) => ({ ...f, [key]: val }));
@@ -79,9 +154,12 @@ export default function AlbumView({ sessions, onFlag, onRate }: Props) {
     return items;
   }, [sessions]);
 
-  // Apply filters
+  // Apply filters + search
   const albumItems = useMemo<AlbumItem[]>(() => {
     return allItems.filter(({ session, variation }) => {
+      // Search
+      if (search && !session.sourceImageName.toLowerCase().includes(search.toLowerCase())) return false;
+      // Flag
       if (filters.flag === 'accepted'   && variation.flag !== 'accepted')  return false;
       if (filters.flag === 'rejected'   && variation.flag !== 'rejected')  return false;
       if (filters.flag === 'unreviewed' && variation.flag != null)          return false;
@@ -92,9 +170,12 @@ export default function AlbumView({ sessions, onFlag, onRate }: Props) {
       if (filters.photoStyle  !== 'all' && p?.photoStyle  !== filters.photoStyle)  return false;
       return true;
     });
-  }, [allItems, filters]);
+  }, [allItems, filters, search]);
+
+  const groups = useMemo(() => groupItems(albumItems, groupBy), [albumItems, groupBy]);
 
   const activeFilterCount = countActive(filters);
+  const activeGroupBy = GROUP_BY_OPTIONS.find((o) => o.value === groupBy)!;
 
   if (allItems.length === 0) {
     return (
@@ -113,8 +194,28 @@ export default function AlbumView({ sessions, onFlag, onRate }: Props) {
       {/* ── Toolbar ── */}
       <div className="mb-4 space-y-3">
 
-        {/* Top bar: filter toggle, count, thumb slider */}
-        <div className="flex items-center gap-3">
+        {/* Search bar */}
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by photo name..."
+            className="w-full pl-8 pr-8 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
+
+        {/* Top bar: filter toggle, group-by, count, thumb slider */}
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setShowFilters((v) => !v)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition-colors ${
@@ -132,12 +233,44 @@ export default function AlbumView({ sessions, onFlag, onRate }: Props) {
             )}
           </button>
 
-          {activeFilterCount > 0 && (
+          {/* Group By */}
+          <div className="relative">
             <button
-              onClick={() => setFilters(DEFAULT_FILTERS)}
+              onClick={() => setShowGroupMenu((v) => !v)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition-colors ${
+                groupBy !== 'none'
+                  ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300'
+                  : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600 hover:text-white'
+              }`}
+            >
+              <Group size={13} />
+              {groupBy !== 'none' ? activeGroupBy.label : 'Group By'}
+            </button>
+            {showGroupMenu && (
+              <div className="absolute top-full mt-1 left-0 z-20 bg-gray-900 border border-gray-700 rounded-xl shadow-xl py-1 min-w-[160px]">
+                {GROUP_BY_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => { setGroupBy(opt.value); setShowGroupMenu(false); }}
+                    className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                      groupBy === opt.value
+                        ? 'text-indigo-300 bg-indigo-600/20'
+                        : 'text-gray-300 hover:bg-gray-800'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {(activeFilterCount > 0 || search) && (
+            <button
+              onClick={() => { setFilters(DEFAULT_FILTERS); setSearch(''); }}
               className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-400 transition-colors"
             >
-              <X size={11} /> Clear filters
+              <X size={11} /> Clear all
             </button>
           )}
 
@@ -149,9 +282,9 @@ export default function AlbumView({ sessions, onFlag, onRate }: Props) {
           <div className="flex items-center gap-2 shrink-0">
             <span className="text-xs text-gray-600">S</span>
             <input
-              type="range" min={120} max={360} step={20} value={thumbSize}
+              type="range" min={60} max={600} step={20} value={thumbSize}
               onChange={(e) => setThumbSize(parseInt(e.target.value))}
-              className="w-24 accent-indigo-500"
+              className="w-28 accent-indigo-500"
               title="Thumbnail size"
             />
             <span className="text-xs text-gray-600">L</span>
@@ -188,7 +321,6 @@ export default function AlbumView({ sessions, onFlag, onRate }: Props) {
             <div>
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Star Rating</p>
               <div className="flex flex-wrap items-center gap-2">
-                {/* Operator buttons */}
                 <div className="flex gap-1">
                   {([null, '>', '>=', '=', '<=', '<'] as (StarOperator | null)[]).map((op) => (
                     <button key={op ?? 'any'} onClick={() => set('starOp', op)}
@@ -201,12 +333,11 @@ export default function AlbumView({ sessions, onFlag, onRate }: Props) {
                     </button>
                   ))}
                 </div>
-                {/* Value selector */}
                 {filters.starOp !== null && (
                   <div className="flex gap-1 ml-1">
                     {[1, 2, 3, 4, 5].map((n) => (
                       <button key={n} onClick={() => set('starValue', n)}
-                        className={`w-8 h-8 rounded-lg border text-sm font-semibold transition-colors flex items-center justify-center gap-0.5 ${
+                        className={`w-8 h-8 rounded-lg border text-sm font-semibold transition-colors flex items-center justify-center ${
                           filters.starValue === n
                             ? 'bg-amber-500/20 border-amber-500 text-amber-300'
                             : 'bg-gray-700/40 border-gray-600 text-gray-400 hover:border-gray-500'
@@ -292,65 +423,81 @@ export default function AlbumView({ sessions, onFlag, onRate }: Props) {
         )}
       </div>
 
-      {/* ── Grid ── */}
+      {/* ── Grid (with optional groups) ── */}
       {albumItems.length === 0 ? (
         <div className="flex flex-col items-center justify-center text-center gap-3 py-16 text-gray-600">
           <p className="text-base font-medium text-gray-500">No photos match the current filters.</p>
-          <button onClick={() => setFilters(DEFAULT_FILTERS)} className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors">
+          <button onClick={() => { setFilters(DEFAULT_FILTERS); setSearch(''); }} className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors">
             Clear all filters
           </button>
         </div>
       ) : (
-        <div
-          className="grid gap-3"
-          style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${thumbSize}px, 1fr))` }}
-        >
-          {albumItems.map((item, i) => {
-            const { variation, session } = item;
-            return (
-              <button
-                key={variation.id}
-                onClick={() => setLightboxIndex(i)}
-                className="group relative aspect-video bg-gray-900 rounded-xl overflow-hidden border border-gray-700 hover:border-indigo-500/60 transition-all hover:shadow-lg hover:shadow-indigo-900/20"
+        <div className="space-y-8">
+          {groups.map((group) => (
+            <div key={group.label || '__all__'}>
+              {/* Group header */}
+              {groupBy !== 'none' && (
+                <div className="flex items-center gap-3 mb-3">
+                  <h3 className="text-sm font-semibold text-gray-400">{group.label}</h3>
+                  <span className="text-xs text-gray-600 bg-gray-800 px-2 py-0.5 rounded-full">{group.items.length}</span>
+                  <div className="flex-1 h-px bg-gray-800" />
+                </div>
+              )}
+              <div
+                className="grid gap-3"
+                style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${thumbSize}px, 1fr))` }}
               >
-                <img
-                  src={variation.blobUrl!}
-                  alt={variation.config.label}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  draggable={false}
-                />
-                {/* Source thumbnail */}
-                <div className="absolute bottom-2 left-2 w-9 h-9 rounded-lg overflow-hidden border-2 border-white/30 shadow-lg bg-gray-900">
-                  <img src={session.sourceImageUrl} alt="" className="w-full h-full object-cover" draggable={false} />
-                </div>
-                {/* Flag badge */}
-                {variation.flag && (
-                  <div className={`absolute top-2 left-2 w-5 h-5 rounded-full flex items-center justify-center shadow ${
-                    variation.flag === 'accepted' ? 'bg-green-500' : 'bg-red-500'
-                  }`}>
-                    {variation.flag === 'accepted'
-                      ? <Check size={10} className="text-white" />
-                      : <ThumbsDown size={9} className="text-white" />
-                    }
-                  </div>
-                )}
-                {/* Star badge */}
-                {variation.rating && (
-                  <div className="absolute top-2 right-2 flex items-center gap-0.5 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded-full">
-                    <Star size={9} className="fill-amber-400 text-amber-400" />
-                    <span className="text-[9px] text-amber-300 font-bold">{variation.rating}</span>
-                  </div>
-                )}
-                {/* Hover label */}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-end p-2">
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity text-left">
-                    <p className="text-xs font-medium text-white drop-shadow">{variation.config.label}</p>
-                    <p className="text-[10px] text-gray-300 truncate max-w-[140px] drop-shadow">{session.sourceImageName}</p>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
+                {group.items.map((item) => {
+                  const { variation, session } = item;
+                  // Find index in flat albumItems for lightbox navigation
+                  const flatIdx = albumItems.indexOf(item);
+                  return (
+                    <button
+                      key={variation.id}
+                      onClick={() => setLightboxIndex(flatIdx)}
+                      className="group relative aspect-video bg-gray-900 rounded-xl overflow-hidden border border-gray-700 hover:border-indigo-500/60 transition-all hover:shadow-lg hover:shadow-indigo-900/20"
+                    >
+                      <img
+                        src={variation.blobUrl!}
+                        alt={variation.config.label}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        draggable={false}
+                      />
+                      {/* Source thumbnail */}
+                      <div className="absolute bottom-2 left-2 w-9 h-9 rounded-lg overflow-hidden border-2 border-white/30 shadow-lg bg-gray-900">
+                        <img src={session.sourceImageUrl} alt="" className="w-full h-full object-cover" draggable={false} />
+                      </div>
+                      {/* Flag badge */}
+                      {variation.flag && (
+                        <div className={`absolute top-2 left-2 w-5 h-5 rounded-full flex items-center justify-center shadow ${
+                          variation.flag === 'accepted' ? 'bg-green-500' : 'bg-red-500'
+                        }`}>
+                          {variation.flag === 'accepted'
+                            ? <Check size={10} className="text-white" />
+                            : <ThumbsDown size={9} className="text-white" />
+                          }
+                        </div>
+                      )}
+                      {/* Star badge */}
+                      {variation.rating && (
+                        <div className="absolute top-2 right-2 flex items-center gap-0.5 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded-full">
+                          <Star size={9} className="fill-amber-400 text-amber-400" />
+                          <span className="text-[9px] text-amber-300 font-bold">{variation.rating}</span>
+                        </div>
+                      )}
+                      {/* Hover label */}
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-end p-2">
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity text-left">
+                          <p className="text-xs font-medium text-white drop-shadow">{variation.config.label}</p>
+                          <p className="text-[10px] text-gray-300 truncate max-w-[140px] drop-shadow">{session.sourceImageName}</p>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -363,6 +510,11 @@ export default function AlbumView({ sessions, onFlag, onRate }: Props) {
           onRate={onRate}
           onClose={() => setLightboxIndex(null)}
         />
+      )}
+
+      {/* Close group-by menu on outside click */}
+      {showGroupMenu && (
+        <div className="fixed inset-0 z-10" onClick={() => setShowGroupMenu(false)} />
       )}
     </>
   );

@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Settings, Layers, Package, LayoutGrid, List } from 'lucide-react';
+import { Settings, Layers, Package, LayoutGrid, List, Sun, Moon } from 'lucide-react';
 import { useSettings } from './hooks/useSettings';
+import { useTheme } from './hooks/useTheme';
 import SettingsModal from './components/SettingsModal';
 import PhotoUploader from './components/PhotoUploader';
 import JobAccordion from './components/JobAccordion';
@@ -33,10 +34,46 @@ function generateId() {
 
 const semaphore = createSemaphore(10);
 
+// Module-level cache: sessionId → Map<variationId, accumulated updates>
+// Used to build correct session state for saving, since the `sess` object
+// passed into generateVariation is stale (captured at creation time).
+const variationUpdates = new Map<string, Map<string, Partial<GeneratedVariation>>>();
+
+function applyUpdate(sessId: string, varId: string, updates: Partial<GeneratedVariation>) {
+  if (!variationUpdates.has(sessId)) variationUpdates.set(sessId, new Map());
+  const m = variationUpdates.get(sessId)!;
+  m.set(varId, { ...m.get(varId), ...updates });
+}
+
+function buildSessionForSave(sess: Session): Session {
+  const m = variationUpdates.get(sess.id);
+  if (!m) return sess;
+  return {
+    ...sess,
+    variations: sess.variations.map((v) => {
+      const u = m.get(v.id);
+      return u ? { ...v, ...u } : v;
+    }),
+  };
+}
+
+// Per-session save queue: each save chains off the previous so reads/writes to
+// IndexedDB are serialised and never interleave with concurrent variation saves.
+const saveLocks = new Map<string, Promise<void>>();
+
+function enqueueSave(sess: Session): void {
+  const prev = saveLocks.get(sess.id) ?? Promise.resolve();
+  // buildSessionForSave is called inside .then() so it reads the cache AFTER
+  // the previous save has finished — always reflects the latest completed updates.
+  const next = prev.then(() => saveSession(buildSessionForSave(sess))).catch(() => {});
+  saveLocks.set(sess.id, next);
+}
+
 type RightView = 'jobs' | 'album';
 
 export default function App() {
   const { settings, updateSettings, loaded } = useSettings();
+  const { theme, toggle: toggleTheme } = useTheme();
   const [showSettings, setShowSettings] = useState(false);
   const [showExport, setShowExport]     = useState(false);
   const [rightView, setRightView]       = useState<RightView>('jobs');
@@ -67,9 +104,14 @@ export default function App() {
         stored.map(async (sess) => {
           const restoredVariations = await Promise.all(
             sess.variations.map(async (v) => {
-              if (v.status === 'done' && !v.blobUrl) {
+              if (v.status === 'done' || v.status === 'idle') {
+                // 'done': blobUrl stripped on save, restore it from imageStore
+                // 'idle': leftover from old bug where session was saved with stale status
                 const blobUrl = await loadImageBlobUrl(v.id);
-                return blobUrl ? { ...v, blobUrl } : v;
+                if (blobUrl) return { ...v, status: 'done' as const, blobUrl };
+                // truly idle (no blob) — leave as error so user can see something went wrong
+                if (v.status === 'idle') return { ...v, status: 'error' as const, error: 'Interrupted — regenerate to retry' };
+                return v; // done but blob missing (e.g. storage cleared) — keep done, no image shown
               }
               if (v.status === 'pending' || v.status === 'polling') {
                 return { ...v, status: 'error' as const, error: 'Interrupted — regenerate to retry' };
@@ -126,7 +168,9 @@ export default function App() {
           if (result.status === 'Ready' && result.result?.sample) {
             const { blobUrl, blob } = await downloadImageAsBlob(result.result.sample);
             await saveImageBlob(variation.id, blob);
+            applyUpdate(sess.id, variation.id, { status: 'done', imageUrl: result.result.sample, seed });
             updateVariation(sess.id, variation.id, { status: 'done', imageUrl: result.result.sample, blobUrl });
+            enqueueSave(sess);
             return;
           }
           if (['Error', 'Request Moderated', 'Content Moderated'].includes(result.status)) {
@@ -136,10 +180,10 @@ export default function App() {
         }
         throw new Error('Timed out waiting for generation');
       } catch (err) {
-        updateVariation(sess.id, variation.id, {
-          status: 'error',
-          error: err instanceof Error ? err.message : String(err),
-        });
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        applyUpdate(sess.id, variation.id, { status: 'error', error: errorMsg });
+        updateVariation(sess.id, variation.id, { status: 'error', error: errorMsg });
+        enqueueSave(sess);
       } finally {
         semaphore.release();
       }
@@ -170,11 +214,13 @@ export default function App() {
       await Promise.all(
         newSessions.map(async (sess, i) => {
           const file = files[i];
+          // Initialise the update cache for this session
+          variationUpdates.set(sess.id, new Map());
           await saveSourceBlob(sess.id, file);
-          await saveSession(sess);
+          await saveSession(sess); // saves initial idle state — will be overwritten as each variation completes
           const base64 = await toBase64(file);
           await Promise.all(sess.variations.map((v) => generateVariation(sess, v, base64)));
-          await saveSession(sess);
+          // No final saveSession(sess) here — each generateVariation saves its own terminal state
         })
       );
     },
@@ -261,6 +307,13 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-lg text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 transition-colors"
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
             <button
               onClick={() => setShowExport(true)}
               className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"

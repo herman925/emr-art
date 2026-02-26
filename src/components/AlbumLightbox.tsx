@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { X, ChevronLeft, ChevronRight, Check, ThumbsDown, Star } from 'lucide-react';
 import type { Session, GeneratedVariation, VariationFlag } from '../types';
 import { INTENSITY_META, ENV_DISPLAY } from '../lib/prompt-builder';
@@ -48,6 +48,11 @@ function StarRow({
 
 export default function AlbumLightbox({ items, currentIndex, onNavigate, onFlag, onRate, onClose }: Props) {
   const item = items[currentIndex];
+  const [dimensions, setDimensions] = useState<{ w: number; h: number } | null>(null);
+
+  // Reset dimensions when navigating to a new image
+  useEffect(() => { setDimensions(null); }, [currentIndex]);
+
   if (!item) return null;
 
   const { session, variation } = item;
@@ -136,12 +141,17 @@ export default function AlbumLightbox({ items, currentIndex, onNavigate, onFlag,
       <div className="flex-1 min-h-0 flex">
 
         {/* Image */}
-        <div className="flex-1 flex items-center justify-center p-6 min-w-0">
+        <div className="flex-1 min-w-0 min-h-0 relative p-6">
           <img
+            key={variation.id}
             src={variation.blobUrl}
             alt={variation.config.label}
-            className="max-w-full max-h-full object-contain rounded-xl"
+            className="absolute inset-6 w-[calc(100%-3rem)] h-[calc(100%-3rem)] object-contain rounded-xl"
             draggable={false}
+            onLoad={(e) => {
+              const img = e.currentTarget;
+              setDimensions({ w: img.naturalWidth, h: img.naturalHeight });
+            }}
           />
         </div>
 
@@ -162,6 +172,16 @@ export default function AlbumLightbox({ items, currentIndex, onNavigate, onFlag,
               </div>
               <p className="text-xs text-gray-500 mt-1.5 truncate">{session.sourceImageName}</p>
             </div>
+
+            {/* Dimensions */}
+            {dimensions && (
+              <div className="px-3 py-2 bg-gray-800 rounded-lg flex items-center justify-between">
+                <p className="text-xs text-gray-500">Dimensions</p>
+                <p className="text-sm font-medium text-white font-mono tabular-nums">
+                  {dimensions.w} × {dimensions.h}
+                </p>
+              </div>
+            )}
 
             {/* Config context */}
             {params && (

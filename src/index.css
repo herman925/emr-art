@@ -1,1 +1,16 @@
 @import "tailwindcss";
+
+/* ── Light theme: remap the gray scale so dark-mode classes invert ── */
+html:not(.dark) {
+  --color-gray-950: #ffffff;
+  --color-gray-900: #f9fafb;
+  --color-gray-800: #f3f4f6;
+  --color-gray-700: #e5e7eb;
+  --color-gray-600: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-400: #374151;
+  --color-gray-300: #1f2937;
+  --color-gray-200: #111827;
+  --color-gray-100: #030712;
+  --color-white: #111827;
+}
