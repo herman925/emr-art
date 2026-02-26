@@ -148,8 +148,17 @@ export async function pollResult(
   apiKey: string,
   pollingUrl: string
 ): Promise<BFLPollingResponse> {
-  const response = await fetch(pollingUrl, {
-    headers: { 'x-key': apiKey },
+  // BFL returns polling URLs on regional subdomains (e.g. api.us2.bfl.ai).
+  // Route them through our proxy, passing the original host in x-bfl-host.
+  const target     = new URL(pollingUrl);
+  const proxyBase  = BFL_BASE.replace(/\/v1\/?$/, '');
+  const proxiedUrl = proxyBase + target.pathname + target.search;
+
+  const response = await fetch(proxiedUrl, {
+    headers: {
+      'x-key':      apiKey,
+      'x-bfl-host': target.hostname,
+    },
   });
 
   if (!response.ok) {

@@ -2,16 +2,11 @@
  * EMR-ART · BFL API CORS Proxy
  * Cloudflare Worker — free tier (100k req/day)
  *
- * Forwards all /v1/* requests to api.bfl.ai and adds
- * Access-Control-Allow-Origin so browsers can call the API directly.
- *
+ * Forwards requests to any *.bfl.ai subdomain and adds CORS headers.
+ * The target host is read from the x-bfl-host header (defaults to api.bfl.ai).
  * The x-key (BFL API key) is forwarded as-is — never stored or logged.
  */
 
-const BFL_ORIGIN = 'https://api.bfl.ai';
-
-// Restrict to your GitHub Pages origin in production.
-// Change to '*' temporarily if you need to test from localhost.
 const ALLOWED_ORIGIN = 'https://herman925.github.io';
 
 export default {
@@ -26,12 +21,25 @@ export default {
       });
     }
 
-    // ── Proxy the request to BFL ───────────────────────────────────────────
-    const targetUrl = BFL_ORIGIN + url.pathname + url.search;
+    // ── Determine target BFL host ──────────────────────────────────────────
+    // Client sets x-bfl-host for regional polling URLs (e.g. api.us2.bfl.ai).
+    // Defaults to api.bfl.ai for all other requests.
+    const requestedHost = request.headers.get('x-bfl-host') ?? 'api.bfl.ai';
 
-    // Forward all headers except Host (Cloudflare sets it automatically)
+    // Security: only allow *.bfl.ai targets
+    if (!requestedHost.endsWith('.bfl.ai')) {
+      return new Response(JSON.stringify({ error: 'Invalid target host' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(request) },
+      });
+    }
+
+    const targetUrl = `https://${requestedHost}${url.pathname}${url.search}`;
+
+    // Forward all headers except Host and x-bfl-host (internal proxy header)
     const forwardHeaders = new Headers(request.headers);
     forwardHeaders.delete('host');
+    forwardHeaders.delete('x-bfl-host');
 
     let bflResponse;
     try {
@@ -41,7 +49,6 @@ export default {
         body:    request.method === 'GET' || request.method === 'HEAD'
                    ? undefined
                    : request.body,
-        // Required for streaming bodies
         duplex: 'half',
       });
     } catch (err) {
@@ -51,7 +58,6 @@ export default {
       });
     }
 
-    // Re-stream the response body with CORS headers added
     const responseHeaders = new Headers(bflResponse.headers);
     const cors = corsHeaders(request);
     for (const [k, v] of Object.entries(cors)) {
@@ -66,7 +72,6 @@ export default {
 };
 
 function corsHeaders(request) {
-  // Echo back the request's Origin if it matches; otherwise use the allowed origin.
   const origin = request.headers.get('Origin') ?? '';
   const allow  = origin === ALLOWED_ORIGIN || origin.startsWith('http://localhost')
     ? origin
@@ -75,7 +80,7 @@ function corsHeaders(request) {
   return {
     'Access-Control-Allow-Origin':  allow,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, x-key',
+    'Access-Control-Allow-Headers': 'Content-Type, x-key, x-bfl-host',
     'Access-Control-Max-Age':       '86400',
   };
 }
