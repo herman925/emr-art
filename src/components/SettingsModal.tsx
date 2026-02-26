@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Eye, EyeOff, Save, RefreshCw, CheckCircle, AlertCircle, Coins } from 'lucide-react';
+import { X, Eye, EyeOff, Save, RefreshCw, CheckCircle, AlertCircle, Coins, Zap, Star, Cpu } from 'lucide-react';
 import type { AppSettings, BFLModel } from '../types';
 import { MODEL_COST_USD } from '../types';
 import { fetchCredits } from '../lib/bfl-client';
@@ -10,35 +10,115 @@ interface Props {
   onClose: () => void;
 }
 
-const MODELS: {
+interface ModelDef {
   value: BFLModel;
-  generation: 'FLUX.2' | 'FLUX.1';
   label: string;
+  sublabel: string;
   note: string;
-}[] = [
+  steps?: string;
+  recommended?: boolean;
+  icon: 'star' | 'zap' | 'cpu';
+}
+
+const MODEL_GROUPS: { group: string; description: string; models: ModelDef[] }[] = [
   {
-    value: 'flux-pro-1.1',
-    generation: 'FLUX.2',
-    label: 'FLUX.2 [pro]',
-    note: 'Recommended · fast, high quality',
+    group: 'FLUX.2 Pro',
+    description: 'Highest quality hosted models — best for production use',
+    models: [
+      {
+        value: 'flux-2-pro',
+        label: 'FLUX.2 [pro]',
+        sublabel: 'flux-2-pro',
+        note: 'Best quality-speed balance',
+        recommended: true,
+        icon: 'star',
+      },
+      {
+        value: 'flux-2-max',
+        label: 'FLUX.2 [max]',
+        sublabel: 'flux-2-max',
+        note: 'Maximum quality, slowest',
+        icon: 'star',
+      },
+      {
+        value: 'flux-2-flex',
+        label: 'FLUX.2 [flex]',
+        sublabel: 'flux-2-flex',
+        note: 'Flexible/premium tier',
+        icon: 'star',
+      },
+      {
+        value: 'flux-2-dev',
+        label: 'FLUX.2 [dev]',
+        sublabel: 'flux-2-dev',
+        note: 'Dev access, lower cost',
+        icon: 'star',
+      },
+    ],
   },
   {
-    value: 'flux-pro-1.1-ultra',
-    generation: 'FLUX.2',
-    label: 'FLUX.2 [pro] Ultra',
-    note: 'Max quality · slower',
+    group: 'FLUX.2 Pro (Legacy paths)',
+    description: 'Older API paths — same models as above, kept for compatibility',
+    models: [
+      {
+        value: 'flux-pro-1.1',
+        label: 'FLUX.2 [pro] v1.1',
+        sublabel: 'flux-pro-1.1',
+        note: 'Alias → flux-2-pro',
+        icon: 'star',
+      },
+      {
+        value: 'flux-pro-1.1-ultra',
+        label: 'FLUX.2 [pro] Ultra v1.1',
+        sublabel: 'flux-pro-1.1-ultra',
+        note: 'Alias → flux-2-max',
+        icon: 'star',
+      },
+    ],
   },
   {
-    value: 'flux-pro',
-    generation: 'FLUX.1',
-    label: 'FLUX.1 [pro]',
-    note: 'Previous gen · stable',
+    group: 'FLUX.2 Klein — Distilled',
+    description: '4-step distilled models — real-time speed, lower cost',
+    models: [
+      {
+        value: 'flux-2-klein-4b',
+        label: 'FLUX.2 Klein 4B',
+        sublabel: 'flux-2-klein-4b',
+        note: '4B params · 4 steps · fastest',
+        steps: '4 steps',
+        icon: 'zap',
+      },
+      {
+        value: 'flux-2-klein-9b',
+        label: 'FLUX.2 Klein 9B',
+        sublabel: 'flux-2-klein-9b',
+        note: '9B params · 4 steps · balanced',
+        steps: '4 steps',
+        icon: 'zap',
+      },
+    ],
   },
   {
-    value: 'flux-dev',
-    generation: 'FLUX.1',
-    label: 'FLUX.1 [dev]',
-    note: 'Previous gen · cheapest',
+    group: 'FLUX.2 Klein — Base (Non-distilled)',
+    description: '50-step full-quality Klein models — no guidance distillation',
+    models: [
+      {
+        value: 'flux-2-klein-base-4b',
+        label: 'FLUX.2 Klein Base 4B',
+        sublabel: 'flux-2-klein-base-4b',
+        note: '4B params · 50 steps · CFG',
+        steps: '50 steps',
+        icon: 'cpu',
+      },
+      {
+        value: 'flux-2-klein-base-9b',
+        label: 'FLUX.2 Klein Base 9B',
+        sublabel: 'flux-2-klein-base-9b',
+        note: '9B params · 50 steps · CFG',
+        steps: '50 steps',
+        icon: 'cpu',
+      },
+    ],
   },
 ];
 
@@ -47,6 +127,12 @@ type BalanceState =
   | { status: 'loading' }
   | { status: 'ok'; credits: number }
   | { status: 'error'; message: string };
+
+const GroupIcon = ({ icon }: { icon: ModelDef['icon'] }) => {
+  if (icon === 'star') return <Star size={13} className="text-indigo-400 shrink-0" />;
+  if (icon === 'zap') return <Zap size={13} className="text-amber-400 shrink-0" />;
+  return <Cpu size={13} className="text-gray-400 shrink-0" />;
+};
 
 export default function SettingsModal({ settings, onSave, onClose }: Props) {
   const [form, setForm] = useState({ ...settings });
@@ -73,17 +159,13 @@ export default function SettingsModal({ settings, onSave, onClose }: Props) {
   };
 
   const costPerImage = MODEL_COST_USD[form.model];
-  const costPerSession = costPerImage * 3; // 3 variations
+  const costPerSession = costPerImage * 3;
   const sessionsRemaining =
-    balance.status === 'ok'
-      ? Math.floor(balance.credits / costPerSession)
-      : null;
-
-  const selectedModel = MODELS.find((m) => m.value === form.model)!;
+    balance.status === 'ok' ? Math.floor(balance.credits / costPerSession) : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 overflow-y-auto">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-lg shadow-2xl my-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 overflow-y-auto">
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-xl shadow-2xl my-6">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-700">
           <h2 className="text-lg font-semibold text-white">Settings</h2>
@@ -92,8 +174,8 @@ export default function SettingsModal({ settings, onSave, onClose }: Props) {
           </button>
         </div>
 
-        <div className="p-6 space-y-5">
-          {/* API Key */}
+        <div className="p-6 space-y-6">
+          {/* ── API Key ───────────────────────────────── */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1.5">
               BFL API Key
@@ -106,7 +188,7 @@ export default function SettingsModal({ settings, onSave, onClose }: Props) {
                   setForm({ ...form, apiKey: e.target.value });
                   setBalance({ status: 'idle' });
                 }}
-                placeholder="Enter your api.bfl.ai key..."
+                placeholder="Enter your api.bfl.ai key…"
                 className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2.5 pr-10 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm"
               />
               <button
@@ -122,29 +204,21 @@ export default function SettingsModal({ settings, onSave, onClose }: Props) {
             </p>
 
             {/* Balance check */}
-            <div className="mt-2 flex items-center gap-2">
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
               <button
                 onClick={checkBalance}
                 disabled={!form.apiKey.trim() || balance.status === 'loading'}
                 className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-gray-300 hover:text-white transition-colors"
               >
-                <RefreshCw
-                  size={12}
-                  className={balance.status === 'loading' ? 'animate-spin' : ''}
-                />
+                <RefreshCw size={12} className={balance.status === 'loading' ? 'animate-spin' : ''} />
                 {balance.status === 'loading' ? 'Checking…' : 'Check Balance'}
               </button>
-
               {balance.status === 'ok' && (
                 <div className="flex items-center gap-1.5 text-xs text-green-300">
                   <CheckCircle size={13} />
-                  <span className="font-mono font-medium">
-                    ${balance.credits.toFixed(2)} remaining
-                  </span>
+                  <span className="font-mono font-medium">${balance.credits.toFixed(2)} remaining</span>
                   {sessionsRemaining !== null && (
-                    <span className="text-green-400/60">
-                      (~{sessionsRemaining} sessions)
-                    </span>
+                    <span className="text-green-400/60">(~{sessionsRemaining} sessions)</span>
                   )}
                 </div>
               )}
@@ -157,47 +231,70 @@ export default function SettingsModal({ settings, onSave, onClose }: Props) {
             </div>
           </div>
 
-          {/* Model */}
+          {/* ── Model selector ───────────────────────── */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">Model</label>
-            <div className="space-y-1.5">
-              {MODELS.map((m) => (
-                <button
-                  key={m.value}
-                  onClick={() => setForm({ ...form, model: m.value })}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border text-sm transition-colors text-left ${
-                    form.model === m.value
-                      ? 'bg-indigo-600/20 border-indigo-500 text-white'
-                      : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-500'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                        m.generation === 'FLUX.2'
-                          ? 'bg-indigo-500/20 text-indigo-300'
-                          : 'bg-gray-600/50 text-gray-400'
-                      }`}
-                    >
-                      {m.generation}
-                    </span>
-                    <span className="font-medium">{m.label}</span>
-                    <span className="text-gray-400 text-xs">— {m.note}</span>
+            <label className="block text-sm font-medium text-gray-300 mb-3">
+              FLUX.2 Model
+              <span className="ml-2 text-xs text-gray-500 font-normal">
+                — all models below are FLUX.2 generation
+              </span>
+            </label>
+
+            <div className="space-y-4">
+              {MODEL_GROUPS.map((grp) => (
+                <div key={grp.group}>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+                    {grp.group}
+                  </p>
+                  <p className="text-xs text-gray-600 mb-2">{grp.description}</p>
+                  <div className="space-y-1">
+                    {grp.models.map((m) => {
+                      const isSelected = form.model === m.value;
+                      return (
+                        <button
+                          key={m.value}
+                          onClick={() => setForm({ ...form, model: m.value })}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-sm transition-all text-left ${
+                            isSelected
+                              ? 'bg-indigo-600/20 border-indigo-500 text-white'
+                              : 'bg-gray-800/60 border-gray-700 text-gray-300 hover:border-gray-500 hover:bg-gray-800'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <GroupIcon icon={m.icon} />
+                            <div className="min-w-0">
+                              <span className="font-medium">{m.label}</span>
+                              {m.recommended && (
+                                <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                                  recommended
+                                </span>
+                              )}
+                              <span className="ml-2 text-gray-500 text-xs">{m.note}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 ml-2 shrink-0">
+                            {m.steps && (
+                              <span className="text-xs text-gray-600 font-mono">{m.steps}</span>
+                            )}
+                            <span className="text-xs font-mono text-gray-400">
+                              ${MODEL_COST_USD[m.value].toFixed(3)}/img
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
-                  <span className="text-gray-400 font-mono text-xs ml-2 shrink-0">
-                    ${MODEL_COST_USD[m.value].toFixed(3)}/img
-                  </span>
-                </button>
+                </div>
               ))}
             </div>
           </div>
 
-          {/* Cost estimation */}
+          {/* ── Cost estimation ──────────────────────── */}
           <div className="bg-gray-800/60 border border-gray-700 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-3">
               <Coins size={14} className="text-amber-400" />
               <span className="text-sm font-medium text-gray-300">Cost Estimation</span>
-              <span className="ml-auto text-xs text-gray-500">{selectedModel.label}</span>
+              <span className="ml-auto text-xs text-gray-500 font-mono">{form.model}</span>
             </div>
             <div className="grid grid-cols-3 gap-3 text-center">
               <div>
@@ -210,13 +307,13 @@ export default function SettingsModal({ settings, onSave, onClose }: Props) {
                 <p className="text-lg font-mono font-semibold text-indigo-300">
                   ${costPerSession.toFixed(3)}
                 </p>
-                <p className="text-xs text-gray-500 mt-0.5">per session (3 variations)</p>
+                <p className="text-xs text-gray-500 mt-0.5">per session (×3)</p>
               </div>
               <div>
                 <p className="text-lg font-mono font-semibold text-amber-300">
                   ${(costPerSession * 10).toFixed(2)}
                 </p>
-                <p className="text-xs text-gray-500 mt-0.5">for 10 sessions</p>
+                <p className="text-xs text-gray-500 mt-0.5">10 sessions</p>
               </div>
             </div>
             {balance.status === 'ok' && (
@@ -229,7 +326,7 @@ export default function SettingsModal({ settings, onSave, onClose }: Props) {
             )}
           </div>
 
-          {/* Image Strength */}
+          {/* ── Image Strength ───────────────────────── */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1.5">
               Image Strength:{' '}
@@ -253,7 +350,7 @@ export default function SettingsModal({ settings, onSave, onClose }: Props) {
             </p>
           </div>
 
-          {/* Output Format */}
+          {/* ── Output Format ────────────────────────── */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1.5">
               Output Format

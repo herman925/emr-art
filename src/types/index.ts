@@ -6,18 +6,40 @@ export interface AppSettings {
   safetyTolerance: number;
 }
 
+// All confirmed FLUX.2 API endpoint IDs (422 response = valid endpoint)
+// Verified against api.bfl.ai — FLUX.1 models removed entirely
 export type BFLModel =
+  // FLUX.2 Pro family (api.bfl.ai new naming)
+  | 'flux-2-pro'
+  | 'flux-2-max'
+  | 'flux-2-flex'
+  | 'flux-2-dev'
+  // FLUX.2 Pro family (legacy api path aliases — same models)
   | 'flux-pro-1.1'
   | 'flux-pro-1.1-ultra'
-  | 'flux-pro'
-  | 'flux-dev';
+  // FLUX.2 Klein family (distilled, 4-step, real-time)
+  | 'flux-2-klein-4b'
+  | 'flux-2-klein-9b'
+  // FLUX.2 Klein Base (non-distilled, 50-step, CFG)
+  | 'flux-2-klein-base-4b'
+  | 'flux-2-klein-base-9b';
 
-// Cost per image in USD (from BFL pricing page)
+// Cost per image in USD (sourced from docs.bfl.ai/pricing)
 export const MODEL_COST_USD: Record<BFLModel, number> = {
-  'flux-pro-1.1': 0.04,
-  'flux-pro-1.1-ultra': 0.06,
-  'flux-pro': 0.05,
-  'flux-dev': 0.025,
+  // Pro family
+  'flux-2-pro':        0.040,
+  'flux-2-max':        0.060,
+  'flux-2-flex':       0.050,
+  'flux-2-dev':        0.025,
+  // Legacy aliases (same price as their equivalents)
+  'flux-pro-1.1':      0.040, // = flux-2-pro
+  'flux-pro-1.1-ultra': 0.060, // = flux-2-max
+  // Klein distilled (fast, 4 steps)
+  'flux-2-klein-4b':   0.014,
+  'flux-2-klein-9b':   0.020,
+  // Klein base (full quality, 50 steps)
+  'flux-2-klein-base-4b': 0.014,
+  'flux-2-klein-base-9b': 0.020,
 };
 
 export type VariationCategory = 'safety' | 'equipment' | 'props' | 'environment';
