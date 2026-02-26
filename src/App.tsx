@@ -30,8 +30,9 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [promptParams, setPromptParams] = useState<PromptParams>({
     environment: 'general',
-    intensity: 'moderate',
+    intensity: 'obvious',
     photoStyle: 'match-source',
+    sceneDescription: '',
   });
 
   const updateVariation = useCallback(

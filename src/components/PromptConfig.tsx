@@ -1,12 +1,7 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, Eye, EyeOff, Wand2 } from 'lucide-react';
-import type {
-  PromptParams,
-  EnvironmentType,
-  ChangeIntensity,
-  PhotoStyle,
-} from '../types';
-import { buildPromptPreview } from '../lib/prompt-builder';
+import type { PromptParams, EnvironmentType, ChangeIntensity, PhotoStyle } from '../types';
+import { buildPromptPreview, INTENSITY_META } from '../lib/prompt-builder';
 import type { BFLModel } from '../types';
 
 interface Props {
@@ -27,12 +22,6 @@ const ENVIRONMENTS: { value: EnvironmentType; label: string; emoji: string }[] =
   { value: 'outdoor',       label: 'Outdoor',         emoji: '🌳' },
 ];
 
-const INTENSITIES: { value: ChangeIntensity; label: string; desc: string }[] = [
-  { value: 'subtle',   label: 'Subtle',   desc: '1 minor change — hardest to spot' },
-  { value: 'moderate', label: 'Moderate', desc: '2–3 changes — balanced difficulty' },
-  { value: 'obvious',  label: 'Obvious',  desc: 'Major changes — easy to spot' },
-];
-
 const PHOTO_STYLES: { value: PhotoStyle; label: string; desc: string }[] = [
   { value: 'match-source',       label: 'Match Source',       desc: 'Infer style from your photo' },
   { value: 'modern-digital',     label: 'Modern Digital',     desc: 'Sony A7IV · sharp · HDR' },
@@ -41,9 +30,11 @@ const PHOTO_STYLES: { value: PhotoStyle; label: string; desc: string }[] = [
 ];
 
 const INTENSITY_COLORS: Record<ChangeIntensity, string> = {
-  subtle:   'bg-green-500/20 border-green-500 text-green-300',
-  moderate: 'bg-amber-500/20 border-amber-500 text-amber-300',
-  obvious:  'bg-red-500/20   border-red-500   text-red-300',
+  minimal:  'bg-sky-500/20    border-sky-500    text-sky-300',
+  subtle:   'bg-green-500/20  border-green-500  text-green-300',
+  moderate: 'bg-amber-500/20  border-amber-500  text-amber-300',
+  obvious:  'bg-orange-500/20 border-orange-500 text-orange-300',
+  major:    'bg-red-500/20    border-red-500    text-red-300',
 };
 
 export default function PromptConfig({ params, model, onChange }: Props) {
@@ -66,8 +57,8 @@ export default function PromptConfig({ params, model, onChange }: Props) {
               <span className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400 capitalize">
                 {params.environment}
               </span>
-              <span className={`text-xs px-2 py-0.5 rounded-full border ${INTENSITY_COLORS[params.intensity]} capitalize`}>
-                {params.intensity}
+              <span className={`text-xs px-2 py-0.5 rounded-full border ${INTENSITY_COLORS[params.intensity]}`}>
+                {INTENSITY_META[params.intensity].label}
               </span>
             </div>
           )}
@@ -109,22 +100,42 @@ export default function PromptConfig({ params, model, onChange }: Props) {
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
               Change Intensity
             </p>
-            <div className="grid grid-cols-3 gap-2">
-              {INTENSITIES.map((i) => (
+            <div className="flex flex-col gap-1.5">
+              {(Object.entries(INTENSITY_META) as [ChangeIntensity, { label: string; instruction: string }][]).map(([value, meta]) => (
                 <button
-                  key={i.value}
-                  onClick={() => onChange({ ...params, intensity: i.value })}
+                  key={value}
+                  onClick={() => onChange({ ...params, intensity: value })}
                   className={`text-left px-3 py-2.5 rounded-lg border transition-colors ${
-                    params.intensity === i.value
-                      ? INTENSITY_COLORS[i.value]
+                    params.intensity === value
+                      ? INTENSITY_COLORS[value]
                       : 'bg-gray-700/50 border-gray-600 text-gray-400 hover:border-gray-500'
                   }`}
                 >
-                  <p className="text-sm font-medium capitalize">{i.label}</p>
-                  <p className="text-[10px] mt-0.5 opacity-70 leading-tight">{i.desc}</p>
+                  <p className="text-sm font-medium">{meta.label}</p>
+                  <p className="text-[10px] mt-0.5 opacity-70 leading-tight line-clamp-2">
+                    {meta.instruction}
+                  </p>
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Scene description */}
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+              Scene Description
+              <span className="ml-1.5 font-normal normal-case text-gray-600">— optional</span>
+            </p>
+            <textarea
+              value={params.sceneDescription}
+              onChange={(e) => onChange({ ...params, sceneDescription: e.target.value })}
+              placeholder="e.g. ball pit, 45° wide angle, colourful foam mats, shelves on left wall"
+              rows={2}
+              className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 resize-none"
+            />
+            <p className="text-[10px] text-gray-600 mt-1">
+              Helps the AI understand your scene when generating variations.
+            </p>
           </div>
 
           {/* Photo style */}

@@ -64,7 +64,7 @@ export type EnvironmentType =
   | 'music'          // Music corner
   | 'outdoor';       // Outdoor play area
 
-export type ChangeIntensity = 'subtle' | 'moderate' | 'obvious';
+export type ChangeIntensity = 'minimal' | 'subtle' | 'moderate' | 'obvious' | 'major';
 
 export type PhotoStyle =
   | 'match-source'
@@ -76,6 +76,7 @@ export interface PromptParams {
   environment: EnvironmentType;
   intensity: ChangeIntensity;
   photoStyle: PhotoStyle;
+  sceneDescription: string; // optional free-text describing what's in the photo
 }
 
 export type VariationStatus = 'idle' | 'pending' | 'polling' | 'done' | 'error';

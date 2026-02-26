@@ -4,9 +4,8 @@
  * Context: ECE (Early Childhood Education) Hubs — community centres for children
  * with themed corners/stations.
  *
- * Follows the official FLUX.2 prompting guide (docs.bfl.ml):
- *   • Pro / Max / Flex / Dev  → JSON structured prompts
- *   • Klein (distilled)       → concise natural language
+ * Core principle: camera angle + spatial layout = LOCKED.
+ * Objects, colours, items within the scene = CHANGEABLE.
  */
 
 import type { EnvironmentType, ChangeIntensity, PhotoStyle, PromptParams } from '../types';
@@ -32,59 +31,91 @@ const STYLE_DESCRIPTOR: Record<PhotoStyle, string> = {
   'indoor-fluorescent':  'indoor overhead lighting, crisp detail, high-fidelity early childhood environment documentation',
 };
 
-const INTENSITY_DESCRIPTOR: Record<ChangeIntensity, string> = {
-  subtle:   'Introduce one small, subtle change somewhere in the scene — something a careful observer would need to look closely to notice. The change should be plausible and realistic for this environment.',
-  moderate: 'Introduce two or three realistic changes in the scene — a mix of relocated items, substituted objects, or altered details that an attentive observer would spot on a second look.',
-  obvious:  'Introduce several clear, noticeable changes throughout the scene — missing items, wrongly placed objects, or altered features that stand out to any observer.',
+// What changes — expressed as assertive instructions, not vague descriptions.
+// The prompt explicitly separates LOCKED elements from CHANGEABLE elements.
+const INTENSITY_CHANGE: Record<ChangeIntensity, { label: string; instruction: string }> = {
+  minimal: {
+    label: 'Minimal',
+    instruction:
+      'Change exactly ONE small detail anywhere in the scene — for example one object changes colour, one item is replaced with a slightly different version, or one small prop is missing. Everything else is pixel-perfect identical to the reference.',
+  },
+  subtle: {
+    label: 'Subtle',
+    instruction:
+      'Change TWO or THREE small details in the scene — for example colours of specific objects shift, small props are swapped for different ones, or a minor item appears or disappears. Changes should require careful side-by-side comparison to notice.',
+  },
+  moderate: {
+    label: 'Moderate',
+    instruction:
+      'Make FOUR to SIX visible changes throughout the scene — replace objects with different ones, change colours of prominent items, add or remove recognisable props, alter the appearance of a feature (e.g. the style or colour of a toy, a mat, or a storage unit). Changes should be clearly noticeable on inspection.',
+  },
+  obvious: {
+    label: 'Obvious',
+    instruction:
+      'Make MANY prominent, immediately noticeable changes throughout the scene — objects are replaced with completely different ones, colours of large features change dramatically, items are added or removed, the appearance of key elements (furniture, toys, equipment, signage, wall displays) is clearly different. A viewer should spot several differences at a glance.',
+  },
+  major: {
+    label: 'Major',
+    instruction:
+      'Transform the scene significantly — dramatically change the colours, contents, and appearance of most elements in the space. Replace, remove, or alter toys, furniture, wall displays, floor coverings, storage units, and props throughout. The scene should look like the same room photographed from the same angle but with a very different setup or theme applied to it.',
+  },
 };
 
 export function buildPrompt(params: PromptParams, model: BFLModel): string {
-  const envLabel      = ENV_LABEL[params.environment];
-  const changeDesc    = INTENSITY_DESCRIPTOR[params.intensity];
-  const styleDesc     = STYLE_DESCRIPTOR[params.photoStyle];
+  const envLabel   = ENV_LABEL[params.environment];
+  const { instruction } = INTENSITY_CHANGE[params.intensity];
+  const styleDesc  = STYLE_DESCRIPTOR[params.photoStyle];
+  const sceneNote  = params.sceneDescription.trim()
+    ? `The reference image shows: ${params.sceneDescription.trim()}.`
+    : '';
 
   if (isKleinModel(model)) {
     return [
       `Photorealistic photograph of a ${envLabel}.`,
-      `Identical camera angle, composition, and spatial layout to the reference image.`,
-      changeDesc,
-      `All unchanged elements preserved exactly as in the reference.`,
+      sceneNote,
+      `LOCKED — must be absolutely identical to the reference: camera angle, focal length, framing, perspective, spatial layout, room structure, walls, floor, ceiling, and all fixed architectural features.`,
+      `CHANGEABLE — apply the following modifications: ${instruction}`,
       `${styleDesc}.`,
-      `High fidelity, indistinguishable from a real photograph.`,
-    ].join(' ');
+      `Output must be indistinguishable from a real photograph.`,
+    ].filter(Boolean).join(' ');
   }
 
   return JSON.stringify({
-    scene: `Photorealistic photograph of a ${envLabel}, based on the provided reference image`,
-    changes: changeDesc,
-    style: `Professional early childhood environment photography — ${styleDesc}`,
-    preservation_rules: [
-      'Camera angle, perspective, focal length, and framing identical to the reference',
-      'All lighting conditions, colour temperature, shadows, and reflections preserved exactly',
-      'All structural elements — walls, floors, ceiling, fixed furniture, shelving — unchanged',
-      'Only items involved in the described changes should differ from the reference',
-      'Depth of field, exposure level, and image sharpness matching the reference',
+    scene: `Photorealistic photograph of a ${envLabel}, based on the provided reference image${sceneNote ? '. ' + sceneNote : ''}`,
+    LOCKED_must_be_identical: [
+      'Camera angle, focal length, perspective, and framing — absolutely identical',
+      'Spatial layout of the room — identical',
+      'Walls, floor, ceiling, windows, doors, and all fixed architectural features — identical',
+      'Lighting direction, colour temperature, and shadows — identical',
+      'Depth of field and exposure — identical',
     ],
-    output_quality: 'Ultra-high fidelity photorealism, indistinguishable from a real early childhood Hub photograph',
+    CHANGEABLE_apply_these_modifications: instruction,
+    style: `Professional early childhood environment photography — ${styleDesc}`,
+    output_quality: 'Ultra-high fidelity photorealism, indistinguishable from a real photograph',
   });
 }
 
 export function buildPromptPreview(params: PromptParams, model: BFLModel): string {
   if (isKleinModel(model)) return buildPrompt(params, model);
   const envLabel   = ENV_LABEL[params.environment];
-  const changeDesc = INTENSITY_DESCRIPTOR[params.intensity];
+  const { instruction } = INTENSITY_CHANGE[params.intensity];
   const styleDesc  = STYLE_DESCRIPTOR[params.photoStyle];
+  const sceneNote  = params.sceneDescription.trim()
+    ? `The reference image shows: ${params.sceneDescription.trim()}.`
+    : '';
   return JSON.stringify({
-    scene: `Photorealistic photograph of a ${envLabel}, based on the provided reference image`,
-    changes: changeDesc,
-    style: `Professional early childhood environment photography — ${styleDesc}`,
-    preservation_rules: [
-      'Camera angle, perspective, focal length, and framing identical to the reference',
-      'All lighting conditions, colour temperature, shadows, and reflections preserved exactly',
-      'All structural elements — walls, floors, ceiling, fixed furniture, shelving — unchanged',
-      'Only items involved in the described changes should differ from the reference',
-      'Depth of field, exposure level, and image sharpness matching the reference',
+    scene: `Photorealistic photograph of a ${envLabel}, based on the provided reference image${sceneNote ? '. ' + sceneNote : ''}`,
+    LOCKED_must_be_identical: [
+      'Camera angle, focal length, perspective, and framing — absolutely identical',
+      'Spatial layout of the room — identical',
+      'Walls, floor, ceiling, windows, doors, and all fixed architectural features — identical',
+      'Lighting direction, colour temperature, and shadows — identical',
+      'Depth of field and exposure — identical',
     ],
-    output_quality: 'Ultra-high fidelity photorealism, indistinguishable from a real early childhood Hub photograph',
+    CHANGEABLE_apply_these_modifications: instruction,
+    style: `Professional early childhood environment photography — ${styleDesc}`,
+    output_quality: 'Ultra-high fidelity photorealism, indistinguishable from a real photograph',
   }, null, 2);
 }
+
+export const INTENSITY_META = INTENSITY_CHANGE;
