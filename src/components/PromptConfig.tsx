@@ -46,7 +46,7 @@ const INTENSITY_COLORS: Record<ChangeIntensity, string> = {
 };
 
 export default function PromptConfig({ params, model, onChange }: Props) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
 
   return (
