@@ -1,11 +1,11 @@
 import { useState, useCallback } from 'react';
-import { Settings, Layers, History } from 'lucide-react';
+import { Settings, Layers, History, Package } from 'lucide-react';
 import { useSettings } from './hooks/useSettings';
 import SettingsModal from './components/SettingsModal';
 import PhotoUploader from './components/PhotoUploader';
 import JobAccordion from './components/JobAccordion';
-import StudentModule from './components/StudentModule';
 import HistoryModal from './components/HistoryModal';
+import BulkExportModal from './components/BulkExportModal';
 import {
   startGeneration,
   pollResult,
@@ -21,9 +21,11 @@ import {
   saveImageBlob,
   loadImageBlobUrl,
   loadSourceBlobUrl,
+  deleteSession,
+  updateSessionMeta,
 } from './lib/storage';
 import PromptConfig from './components/PromptConfig';
-import type { Session, GeneratedVariation, PromptParams } from './types';
+import type { Session, GeneratedVariation, PromptParams, SessionFlag } from './types';
 
 function generateId() {
   return Math.random().toString(36).slice(2, 10);
@@ -35,8 +37,8 @@ export default function App() {
   const { settings, updateSettings } = useSettings();
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory]   = useState(false);
+  const [showExport, setShowExport]     = useState(false);
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [studentSessionId, setStudentSessionId] = useState<string | null>(null);
   const [variationCount, setVariationCount] = useState(3);
   const [promptParams, setPromptParams] = useState<PromptParams>({
     environment: 'general',
@@ -182,6 +184,21 @@ export default function App() {
 
   const handleRemoveJob = useCallback((sessionId: string) => {
     setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    deleteSession(sessionId); // also purge from history + blobs
+  }, []);
+
+  const handleFlagSession = useCallback((sessionId: string, flag: SessionFlag | undefined) => {
+    setSessions((prev) =>
+      prev.map((s) => (s.id === sessionId ? { ...s, flag } : s))
+    );
+    updateSessionMeta(sessionId, { flag });
+  }, []);
+
+  const handleRateSession = useCallback((sessionId: string, rating: number | undefined) => {
+    setSessions((prev) =>
+      prev.map((s) => (s.id === sessionId ? { ...s, rating } : s))
+    );
+    updateSessionMeta(sessionId, { rating });
   }, []);
 
   const handleRestoreSession = useCallback(async (restored: Session) => {
@@ -210,19 +227,6 @@ export default function App() {
     setShowHistory(false);
   }, []);
 
-  const studentSession = studentSessionId
-    ? sessions.find((s) => s.id === studentSessionId) ?? null
-    : null;
-
-  if (studentSession) {
-    return (
-      <StudentModule
-        session={studentSession}
-        onBack={() => setStudentSessionId(null)}
-      />
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
       {/* Header */}
@@ -238,6 +242,13 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowExport(true)}
+              className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"
+            >
+              <Package size={15} />
+              Export
+            </button>
             <button
               onClick={() => setShowHistory(true)}
               className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"
@@ -331,8 +342,9 @@ export default function App() {
                   key={sess.id}
                   session={sess}
                   onRegenerate={handleRegenerate}
-                  onStudentView={() => setStudentSessionId(sess.id)}
                   onRemove={() => handleRemoveJob(sess.id)}
+                  onFlag={(flag) => handleFlagSession(sess.id, flag)}
+                  onRate={(rating) => handleRateSession(sess.id, rating)}
                 />
               ))}
             </div>
@@ -345,6 +357,9 @@ export default function App() {
       )}
       {showHistory && (
         <HistoryModal onRestore={handleRestoreSession} onClose={() => setShowHistory(false)} />
+      )}
+      {showExport && (
+        <BulkExportModal onClose={() => setShowExport(false)} />
       )}
     </div>
   );

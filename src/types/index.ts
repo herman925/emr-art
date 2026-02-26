@@ -104,12 +104,16 @@ export interface GeneratedVariation {
   cost?: number;
 }
 
+export type SessionFlag = 'accepted' | 'rejected';
+
 export interface Session {
   id: string;
   createdAt: string;
   sourceImageName: string;
   sourceImageUrl: string;
   variations: GeneratedVariation[];
+  flag?: SessionFlag;      // accept / reject review state
+  rating?: number;         // 1–5 stars; undefined = unrated
 }
 
 export type AppView = 'upload' | 'generating' | 'review' | 'student';
