@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import JSZip from 'jszip';
 import { X, Download, Star, Check, ThumbsDown, Package, Filter } from 'lucide-react';
+// Star is used in the star-filter buttons below
 import type { Session } from '../types';
 import { loadSessions, loadImageBlobUrl, loadSourceBlobUrl } from '../lib/storage';
 
@@ -43,23 +44,21 @@ export default function BulkExportModal({ onClose }: Props) {
     })();
   }, []);
 
-  // Filter sessions
+  // Filter sessions (based on per-variation flags/ratings)
   const filtered = useMemo(() => {
-    return sessions.filter((sess) => {
-      // Flag filter
-      if (flagFilter === 'accepted'   && sess.flag !== 'accepted')  return false;
-      if (flagFilter === 'rejected'   && sess.flag !== 'rejected')  return false;
-      if (flagFilter === 'unreviewed' && sess.flag != null)          return false;
-
-      // Star filter
-      if (minStars > 0) {
-        if (!sess.rating || sess.rating < minStars) return false;
-      }
-
-      // Must have at least one done variation
-      const hasDone = sess.variations.some((v) => v.status === 'done');
-      return hasDone;
-    });
+    return sessions
+      .map((sess) => {
+        const matchingVariations = sess.variations.filter((v) => {
+          if (v.status !== 'done') return false;
+          if (flagFilter === 'accepted'   && v.flag !== 'accepted')  return false;
+          if (flagFilter === 'rejected'   && v.flag !== 'rejected')  return false;
+          if (flagFilter === 'unreviewed' && v.flag != null)          return false;
+          if (minStars > 0 && (!v.rating || v.rating < minStars))    return false;
+          return true;
+        });
+        return { ...sess, variations: matchingVariations };
+      })
+      .filter((sess) => sess.variations.length > 0);
   }, [sessions, flagFilter, minStars]);
 
   const totalVariations = filtered.reduce(
@@ -92,9 +91,8 @@ export default function BulkExportModal({ onClose }: Props) {
           }
         }
 
-        const doneVariations = sess.variations.filter((v) => v.status === 'done');
-        for (let vi = 0; vi < doneVariations.length; vi++) {
-          const v = doneVariations[vi];
+        for (let vi = 0; vi < sess.variations.length; vi++) {
+          const v = sess.variations[vi];
           const blobUrl = await loadImageBlobUrl(v.id);
           if (!blobUrl) continue;
           const res = await fetch(blobUrl);
@@ -224,7 +222,7 @@ export default function BulkExportModal({ onClose }: Props) {
           ) : (
             <div className="space-y-2">
               {filtered.map((sess) => {
-                const doneCount = sess.variations.filter((v) => v.status === 'done').length;
+                const doneCount = sess.variations.length; // already filtered to matching variations
                 return (
                   <div key={sess.id} className="flex items-center gap-3 p-2.5 bg-gray-800/60 border border-gray-700 rounded-xl">
                     <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-700 shrink-0">
@@ -234,21 +232,14 @@ export default function BulkExportModal({ onClose }: Props) {
                       <p className="text-sm font-medium text-white truncate">{sess.sourceImageName}</p>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         <span className="text-xs text-gray-500">{doneCount} variation{doneCount !== 1 ? 's' : ''}</span>
-                        {sess.flag === 'accepted' && (
+                        {sess.variations.some((v) => v.flag === 'accepted') && (
                           <span className="flex items-center gap-1 text-xs text-green-400">
-                            <Check size={10} /> Accepted
+                            <Check size={10} /> {sess.variations.filter((v) => v.flag === 'accepted').length} accepted
                           </span>
                         )}
-                        {sess.flag === 'rejected' && (
+                        {sess.variations.some((v) => v.flag === 'rejected') && (
                           <span className="flex items-center gap-1 text-xs text-red-400">
-                            <ThumbsDown size={10} /> Rejected
-                          </span>
-                        )}
-                        {sess.rating && (
-                          <span className="flex items-center gap-0.5 text-xs text-amber-400">
-                            {Array.from({ length: sess.rating }, (_, i) => (
-                              <Star key={i} size={10} className="fill-amber-400" />
-                            ))}
+                            <ThumbsDown size={10} /> {sess.variations.filter((v) => v.flag === 'rejected').length} rejected
                           </span>
                         )}
                       </div>

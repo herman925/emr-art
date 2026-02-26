@@ -102,9 +102,11 @@ export interface GeneratedVariation {
   error?: string;
   seed?: number;
   cost?: number;
+  flag?: VariationFlag;  // per-variation review state
+  rating?: number;       // 1–5 stars; undefined = unrated
 }
 
-export type SessionFlag = 'accepted' | 'rejected';
+export type VariationFlag = 'accepted' | 'rejected';
 
 export interface Session {
   id: string;
@@ -112,8 +114,8 @@ export interface Session {
   sourceImageName: string;
   sourceImageUrl: string;
   variations: GeneratedVariation[];
-  flag?: SessionFlag;      // accept / reject review state
-  rating?: number;         // 1–5 stars; undefined = unrated
+  promptParams?: PromptParams; // config used when generating (for context in review)
+  model?: string;              // model used
 }
 
 export type AppView = 'upload' | 'generating' | 'review' | 'student';

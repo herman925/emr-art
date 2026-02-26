@@ -68,17 +68,6 @@ export async function saveSession(session: Session): Promise<void> {
   await localforage.setItem(SESSIONS_KEY, sessions);
 }
 
-/** Patch flag / rating on a stored session without touching blobs. */
-export async function updateSessionMeta(
-  id: string,
-  updates: Partial<Pick<Session, 'flag' | 'rating'>>
-): Promise<void> {
-  const sessions = await loadSessions();
-  const idx = sessions.findIndex((s) => s.id === id);
-  if (idx < 0) return;
-  sessions[idx] = { ...sessions[idx], ...updates };
-  await localforage.setItem(SESSIONS_KEY, sessions);
-}
 
 export async function deleteSession(id: string): Promise<void> {
   const sessions = await loadSessions();

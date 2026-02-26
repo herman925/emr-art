@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Loader2, CheckCircle, XCircle, RefreshCw, Download, Eye, EyeOff } from 'lucide-react';
+import { Loader2, XCircle, RefreshCw, Download, Eye, EyeOff, Check, ThumbsDown, Star } from 'lucide-react';
 import type { GeneratedVariation } from '../types';
 
 interface Props {
@@ -8,7 +8,6 @@ interface Props {
   onRegenerate?: (id: string) => void;
   onZoom?: () => void;
 }
-
 
 export default function VariationCard({ variation, index, onRegenerate, onZoom }: Props) {
   const [showPrompt, setShowPrompt] = useState(false);
@@ -22,7 +21,11 @@ export default function VariationCard({ variation, index, onRegenerate, onZoom }
   };
 
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
+    <div className={`border rounded-xl overflow-hidden transition-colors ${
+      variation.flag === 'accepted' ? 'bg-green-900/10 border-green-800/50' :
+      variation.flag === 'rejected' ? 'bg-red-900/10 border-red-900/40 opacity-70' :
+      'bg-gray-800 border-gray-700'
+    }`}>
       {/* Image area */}
       <div className="aspect-video bg-gray-900 relative flex items-center justify-center">
         {variation.status === 'done' && variation.blobUrl ? (
@@ -34,34 +37,41 @@ export default function VariationCard({ variation, index, onRegenerate, onZoom }
           />
         ) : variation.status === 'error' ? (
           <div className="flex flex-col items-center gap-2 text-red-400 p-4 text-center">
-            <XCircle size={32} />
-            <p className="text-sm">{variation.error ?? 'Generation failed'}</p>
+            <XCircle size={28} />
+            <p className="text-xs">{variation.error ?? 'Generation failed'}</p>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-3 text-gray-500">
-            <Loader2 size={32} className="animate-spin text-indigo-400" />
-            <p className="text-sm text-gray-400 capitalize">{variation.status}…</p>
+            <Loader2 size={28} className="animate-spin text-indigo-400" />
+            <p className="text-xs text-gray-400 capitalize">{variation.status}…</p>
           </div>
         )}
 
-        {/* Status badge */}
-        {variation.status === 'done' && (
-          <div className="absolute top-2 right-2 bg-green-500/20 border border-green-500/30 text-green-300 text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
-            <CheckCircle size={11} />
-            Ready
+        {/* Flag badge */}
+        {variation.flag && (
+          <div className={`absolute top-2 left-2 w-5 h-5 rounded-full flex items-center justify-center shadow ${
+            variation.flag === 'accepted' ? 'bg-green-500' : 'bg-red-500'
+          }`}>
+            {variation.flag === 'accepted'
+              ? <Check size={10} className="text-white" />
+              : <ThumbsDown size={9} className="text-white" />
+            }
+          </div>
+        )}
+
+        {/* Star badge */}
+        {variation.rating && (
+          <div className="absolute top-2 right-2 flex items-center gap-0.5 bg-black/60 px-1.5 py-0.5 rounded-full">
+            <Star size={9} className="fill-amber-400 text-amber-400" />
+            <span className="text-[9px] text-amber-300 font-bold">{variation.rating}</span>
           </div>
         )}
       </div>
 
       {/* Info */}
       <div className="p-3">
-        <div className="flex items-center justify-between gap-2 mb-1">
-          <span className="text-white text-sm font-medium truncate">
-            {variation.config.label}
-          </span>
-        </div>
+        <span className="text-white text-sm font-medium truncate block">{variation.config.label}</span>
 
-        {/* Actions */}
         {variation.status === 'done' && (
           <div className="flex gap-2 mt-2">
             <button
@@ -69,7 +79,7 @@ export default function VariationCard({ variation, index, onRegenerate, onZoom }
               className="flex items-center gap-1 text-xs text-gray-400 hover:text-white px-2 py-1 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors"
             >
               <Download size={12} />
-              Download
+              Save
             </button>
             {onRegenerate && (
               <button
@@ -77,7 +87,7 @@ export default function VariationCard({ variation, index, onRegenerate, onZoom }
                 className="flex items-center gap-1 text-xs text-gray-400 hover:text-white px-2 py-1 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors"
               >
                 <RefreshCw size={12} />
-                Regenerate
+                Retry
               </button>
             )}
           </div>
@@ -102,7 +112,7 @@ export default function VariationCard({ variation, index, onRegenerate, onZoom }
             {showPrompt ? 'Hide prompt' : 'View prompt'}
           </button>
           {showPrompt && (
-            <pre className="mt-1.5 text-[9px] text-gray-400 bg-gray-900 border border-gray-700 rounded-lg p-2 whitespace-pre-wrap break-words leading-relaxed font-mono max-h-32 overflow-y-auto">
+            <pre className="mt-1.5 text-[9px] text-gray-400 bg-gray-900 border border-gray-700 rounded-lg p-2 whitespace-pre-wrap break-words leading-relaxed font-mono max-h-24 overflow-y-auto">
               {variation.config.prompt}
             </pre>
           )}

@@ -149,3 +149,15 @@ export function buildPromptPreview(params: PromptParams, model: BFLModel): strin
 }
 
 export const INTENSITY_META = INTENSITY_CHANGE;
+
+export const ENV_DISPLAY: Record<EnvironmentType, { label: string; emoji: string }> = {
+  'general':       { label: 'General Hub',   emoji: '🏠' },
+  'art':           { label: 'Art & Craft',   emoji: '🎨' },
+  'reading':       { label: 'Reading',       emoji: '📚' },
+  'blocks':        { label: 'Blocks',        emoji: '🧱' },
+  'dramatic-play': { label: 'Dramatic Play', emoji: '🎭' },
+  'science':       { label: 'Science',       emoji: '🔬' },
+  'sensory':       { label: 'Sensory Play',  emoji: '💧' },
+  'music':         { label: 'Music',         emoji: '🎵' },
+  'outdoor':       { label: 'Outdoor',       emoji: '🌳' },
+};
