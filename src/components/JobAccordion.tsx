@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, GraduationCap, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, GraduationCap, X, ScanSearch } from 'lucide-react';
 import type { Session } from '../types';
 import VariationCard from './VariationCard';
 import BatchDownload from './BatchDownload';
+import ImageCompareModal from './ImageCompareModal';
 
 interface Props {
   session: Session;
@@ -18,8 +19,9 @@ export default function JobAccordion({ session, onRegenerate, onStudentView, onR
   const allDone = done + errors === total;
   const progress = total > 0 ? (done + errors) / total : 0;
 
-  // Start collapsed by default
   const [expanded, setExpanded] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [compareInitialIdx, setCompareInitialIdx] = useState(0);
 
   const statusColor = allDone
     ? errors === total ? 'text-red-400' : errors > 0 ? 'text-amber-400' : 'text-green-400'
@@ -62,6 +64,16 @@ export default function JobAccordion({ session, onRegenerate, onStudentView, onR
 
         {/* Actions */}
         <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+          {done > 0 && (
+            <button
+              onClick={() => { setCompareInitialIdx(0); setCompareOpen(true); }}
+              className="flex items-center gap-1 text-xs text-gray-400 hover:text-white px-2 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors"
+              title="Compare variations"
+            >
+              <ScanSearch size={12} />
+              Compare
+            </button>
+          )}
           {allDone && done > 0 && onStudentView && (
             <button
               onClick={onStudentView}
@@ -99,6 +111,7 @@ export default function JobAccordion({ session, onRegenerate, onStudentView, onR
                 variation={v}
                 index={i}
                 onRegenerate={allDone ? onRegenerate : undefined}
+                onZoom={v.status === 'done' ? () => { setCompareInitialIdx(session.variations.filter((x, j) => x.status === 'done' && j <= i).length - 1); setCompareOpen(true); } : undefined}
               />
             ))}
           </div>
@@ -107,6 +120,14 @@ export default function JobAccordion({ session, onRegenerate, onStudentView, onR
             <BatchDownload session={session} />
           )}
         </div>
+      )}
+
+      {compareOpen && (
+        <ImageCompareModal
+          session={session}
+          initialVariationIndex={compareInitialIdx}
+          onClose={() => setCompareOpen(false)}
+        />
       )}
     </div>
   );

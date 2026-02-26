@@ -6,10 +6,11 @@ interface Props {
   variation: GeneratedVariation;
   index: number;
   onRegenerate?: (id: string) => void;
+  onZoom?: () => void;
 }
 
 
-export default function VariationCard({ variation, index, onRegenerate }: Props) {
+export default function VariationCard({ variation, index, onRegenerate, onZoom }: Props) {
   const [showPrompt, setShowPrompt] = useState(false);
 
   const downloadImage = () => {
@@ -28,7 +29,8 @@ export default function VariationCard({ variation, index, onRegenerate }: Props)
           <img
             src={variation.blobUrl}
             alt={variation.config.label}
-            className="w-full h-full object-cover"
+            className={`w-full h-full object-cover ${onZoom ? 'cursor-zoom-in' : ''}`}
+            onClick={onZoom}
           />
         ) : variation.status === 'error' ? (
           <div className="flex flex-col items-center gap-2 text-red-400 p-4 text-center">
