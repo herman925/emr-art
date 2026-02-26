@@ -42,7 +42,9 @@ export default function PromptConfig({ params, model, onChange, variationCount, 
   const [expanded, setExpanded] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
 
-  const selectedEnv = ENVIRONMENTS.find((e) => e.value === params.environment)!;
+  const selectedEnv  = ENVIRONMENTS.find((e) => e.value === params.environment)!;
+  const selectedStyle = PHOTO_STYLES.find((s) => s.value === params.photoStyle)!;
+  const intensityMeta = INTENSITY_META[params.intensity];
 
   return (
     <div className="w-full mb-4">
@@ -54,17 +56,6 @@ export default function PromptConfig({ params, model, onChange, variationCount, 
         <div className="flex items-center gap-2.5">
           <Wand2 size={16} className="text-indigo-400 shrink-0" />
           <span className="text-sm font-semibold text-white">Prompt Configuration</span>
-          {/* Summary pills when collapsed */}
-          {!expanded && (
-            <div className="flex items-center gap-1.5 ml-1">
-              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-300">
-                {selectedEnv.emoji} {selectedEnv.label}
-              </span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-300">
-                {INTENSITY_META[params.intensity].icon} {INTENSITY_META[params.intensity].label}
-              </span>
-            </div>
-          )}
         </div>
         {expanded ? (
           <ChevronUp size={15} className="text-gray-400 shrink-0" />
@@ -72,6 +63,29 @@ export default function PromptConfig({ params, model, onChange, variationCount, 
           <ChevronDown size={15} className="text-gray-400 shrink-0" />
         )}
       </button>
+
+      {/* Summary pills — always visible below the toggle */}
+      {!expanded && (
+        <div className="flex flex-wrap gap-1.5 mt-2 px-1">
+          <span className="text-xs px-2.5 py-1 rounded-full bg-gray-800 border border-gray-700 text-gray-300">
+            {selectedEnv.emoji} {selectedEnv.label}
+          </span>
+          <span className="text-xs px-2.5 py-1 rounded-full bg-gray-800 border border-gray-700 text-gray-300">
+            {intensityMeta.icon} {intensityMeta.label}
+          </span>
+          <span className="text-xs px-2.5 py-1 rounded-full bg-gray-800 border border-gray-700 text-gray-300">
+            {selectedStyle.label}
+          </span>
+          <span className="text-xs px-2.5 py-1 rounded-full bg-indigo-900/40 border border-indigo-800 text-indigo-300">
+            ×{variationCount}
+          </span>
+          {params.sceneDescription && (
+            <span className="text-xs px-2.5 py-1 rounded-full bg-gray-800 border border-gray-700 text-gray-400 max-w-[180px] truncate">
+              "{params.sceneDescription}"
+            </span>
+          )}
+        </div>
+      )}
 
       {expanded && (
         <div className="mt-2 bg-gray-800/60 border border-gray-700 rounded-xl p-4 space-y-5">

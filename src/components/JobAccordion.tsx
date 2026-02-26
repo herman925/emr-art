@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { ChevronDown, ChevronUp, X, Eye, Check, ThumbsDown } from 'lucide-react';
 import type { Session } from '../types';
 import VariationCard from './VariationCard';
-import BatchDownload from './BatchDownload';
 import ImageCompareModal from './ImageCompareModal';
 
 interface Props {
@@ -125,7 +124,6 @@ export default function JobAccordion({ session, onRegenerate, onRemove }: Props)
             ))}
           </div>
 
-          {allDone && done > 0 && <BatchDownload session={session} />}
         </div>
       )}
 

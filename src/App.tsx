@@ -256,8 +256,8 @@ export default function App() {
               <Layers size={18} />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white leading-none">EMR-ART</h1>
-              <p className="text-xs text-gray-400 mt-0.5">AI Observational Training</p>
+              <h1 className="text-lg font-bold text-white leading-none">Event-Based Memory Test</h1>
+              <p className="text-xs text-gray-400 mt-0.5">AI Art Generation System</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
