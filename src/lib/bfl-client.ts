@@ -1,11 +1,18 @@
 import type { AppSettings, VariationConfig, BFLModel } from '../types';
 
-const BFL_BASE = 'https://api.bfl.ai/v1';
+// In production (GitHub Pages), VITE_API_PROXY must be set to your Cloudflare Worker URL
+// e.g. https://emr-art-proxy.yourname.workers.dev/v1
+// Locally, falls back to direct API (which works fine without CORS restrictions in tools/Node).
+const BFL_BASE = (import.meta.env.VITE_API_PROXY as string | undefined)?.replace(/\/$/, '')
+  ?? 'https://api.bfl.ai/v1';
 
-// FLUX.2 Pro/Max/Flex/Dev: input_image + input_image_2..8, no strength param
+// ── Per-model schemas (from official OpenAPI spec at docs.bfl.ml) ─────────────
+
+// flux-2-pro, flux-2-dev, flux-pro-1.1, flux-pro-1.1-ultra
+// Up to 8 reference images. No guidance/steps controls.
 interface Flux2ProBody {
   prompt: string;
-  input_image?: string;        // base64 — primary reference image
+  input_image?: string;
   input_image_2?: string;
   input_image_3?: string;
   input_image_4?: string;
@@ -20,7 +27,16 @@ interface Flux2ProBody {
   output_format?: string;
 }
 
-// FLUX.2 Klein (distilled & base): same structure, but max 4 input images
+// flux-2-flex, flux-2-max
+// Up to 8 reference images + prompt_upsampling + guidance + steps
+interface Flux2FlexBody extends Flux2ProBody {
+  prompt_upsampling?: boolean; // default: true — auto-enriches prompt via Mistral
+  guidance?: number;           // 1.5–10, default: 5
+  steps?: number;              // 1–50, default: 50
+}
+
+// flux-2-klein-4b, flux-2-klein-9b, flux-2-klein-base-4b, flux-2-klein-base-9b
+// Max 4 reference images. No image_prompt_strength.
 interface Flux2KleinBody {
   prompt: string;
   input_image?: string;
@@ -34,10 +50,12 @@ interface Flux2KleinBody {
   output_format?: string;
 }
 
-interface BFLInitialResponse {
+type AnyFluxBody = Flux2ProBody | Flux2FlexBody | Flux2KleinBody;
+
+export interface BFLInitialResponse {
   id: string;
   polling_url: string;
-  cost?: number;       // credits charged (1 credit = $0.01 USD)
+  cost?: number;      // credits charged (divide by 100 for USD)
   input_mp?: number;
   output_mp?: number;
 }
@@ -57,8 +75,14 @@ const KLEIN_MODELS: BFLModel[] = [
   'flux-2-klein-base-9b',
 ];
 
-function isKleinModel(model: BFLModel): boolean {
+const FLEX_MODELS: BFLModel[] = ['flux-2-flex', 'flux-2-max'];
+
+export function isKleinModel(model: BFLModel): boolean {
   return KLEIN_MODELS.includes(model);
+}
+
+export function isFlexModel(model: BFLModel): boolean {
+  return FLEX_MODELS.includes(model);
 }
 
 export async function startGeneration(
@@ -69,16 +93,39 @@ export async function startGeneration(
 ): Promise<BFLInitialResponse> {
   const endpoint = `${BFL_BASE}/${settings.model}`;
 
-  // All FLUX.2 models use input_image (not image_prompt)
-  // Klein supports up to 4 refs, Pro/Max/Flex/Dev up to 8
-  // No image_prompt_strength — FLUX.2 conditions on reference images directly
-  const body: Flux2ProBody | Flux2KleinBody = {
-    prompt: variation.prompt,
-    input_image: sourceBase64,
-    seed,
-    safety_tolerance: settings.safetyTolerance,
-    output_format: settings.outputFormat,
-  };
+  let body: AnyFluxBody;
+
+  if (isKleinModel(settings.model)) {
+    // Klein: max 4 input images, no guidance/steps/prompt_upsampling
+    body = {
+      prompt: variation.prompt,
+      input_image: sourceBase64,
+      seed,
+      safety_tolerance: settings.safetyTolerance,
+      output_format: settings.outputFormat,
+    } satisfies Flux2KleinBody;
+  } else if (isFlexModel(settings.model)) {
+    // Flex/Max: up to 8 images + guidance + steps + prompt_upsampling
+    body = {
+      prompt: variation.prompt,
+      input_image: sourceBase64,
+      seed,
+      safety_tolerance: settings.safetyTolerance,
+      output_format: settings.outputFormat,
+      prompt_upsampling: settings.promptUpsampling ?? true,
+      guidance: settings.guidance,
+      steps: settings.steps,
+    } satisfies Flux2FlexBody;
+  } else {
+    // Pro / Dev / legacy aliases: up to 8 images, no extra params
+    body = {
+      prompt: variation.prompt,
+      input_image: sourceBase64,
+      seed,
+      safety_tolerance: settings.safetyTolerance,
+      output_format: settings.outputFormat,
+    } satisfies Flux2ProBody;
+  }
 
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -120,7 +167,7 @@ export async function downloadImageAsBlob(url: string): Promise<string> {
 }
 
 export interface BFLCreditsResponse {
-  credits: number; // raw credits, divide by 100 for USD
+  credits: number; // raw credits — divide by 100 for USD
 }
 
 export async function fetchCredits(apiKey: string): Promise<BFLCreditsResponse> {
@@ -139,12 +186,9 @@ export function toBase64(file: File): Promise<string> {
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result as string;
-      // Strip data URL prefix — BFL expects raw base64
       resolve(result.split(',')[1]);
     };
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
 }
-
-export { isKleinModel };

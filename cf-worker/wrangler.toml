@@ -1,0 +1,7 @@
+name            = "emr-art-proxy"
+main            = "index.js"
+compatibility_date = "2024-01-01"
+
+# Free tier — no Workers Paid plan needed
+# After deploy, your URL will be:
+#   https://emr-art-proxy.<your-cf-subdomain>.workers.dev
