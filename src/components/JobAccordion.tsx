@@ -1,0 +1,105 @@
+import { useState } from 'react';
+import { ChevronDown, ChevronUp, GraduationCap } from 'lucide-react';
+import type { Session } from '../types';
+import VariationCard from './VariationCard';
+import BatchDownload from './BatchDownload';
+
+interface Props {
+  session: Session;
+  onRegenerate?: (variationId: string) => void;
+  onStudentView?: () => void;
+}
+
+export default function JobAccordion({ session, onRegenerate, onStudentView }: Props) {
+  const total  = session.variations.length;
+  const done   = session.variations.filter((v) => v.status === 'done').length;
+  const errors = session.variations.filter((v) => v.status === 'error').length;
+  const allDone = done + errors === total;
+  const progress = total > 0 ? (done + errors) / total : 0;
+
+  // Expand while generating; collapse once fully done
+  const [expanded, setExpanded] = useState(!allDone || done > 0);
+
+  const statusColor = allDone
+    ? errors === total ? 'text-red-400' : errors > 0 ? 'text-amber-400' : 'text-green-400'
+    : 'text-indigo-400';
+
+  const statusLabel = allDone
+    ? errors === total ? 'Failed' : errors > 0 ? `${done}/${total} done` : 'Complete'
+    : `${done}/${total} generating…`;
+
+  return (
+    <div className="bg-gray-800/60 border border-gray-700 rounded-xl overflow-hidden">
+      {/* Accordion header */}
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center gap-3 p-3 hover:bg-gray-700/40 transition-colors text-left"
+      >
+        {/* Source thumbnail */}
+        <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-700 shrink-0">
+          <img src={session.sourceImageUrl} alt="" className="w-full h-full object-cover" />
+        </div>
+
+        {/* Meta */}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-white truncate">{session.sourceImageName}</p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className={`text-xs font-medium ${statusColor}`}>{statusLabel}</span>
+            <span className="text-xs text-gray-600">·</span>
+            <span className="text-xs text-gray-600">{total} variation{total !== 1 ? 's' : ''}</span>
+          </div>
+          {/* Progress bar */}
+          <div className="mt-1.5 h-1 bg-gray-700 rounded-full overflow-hidden w-full">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${
+                allDone && errors === 0 ? 'bg-green-500' : allDone ? 'bg-amber-500' : 'bg-indigo-500'
+              }`}
+              style={{ width: `${(progress * 100).toFixed(0)}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Actions (only when done) */}
+        {allDone && done > 0 && (
+          <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+            {onStudentView && (
+              <button
+                onClick={onStudentView}
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-white px-2 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors"
+              >
+                <GraduationCap size={12} />
+                Student
+              </button>
+            )}
+          </div>
+        )}
+
+        {expanded ? (
+          <ChevronUp size={15} className="text-gray-500 shrink-0" />
+        ) : (
+          <ChevronDown size={15} className="text-gray-500 shrink-0" />
+        )}
+      </button>
+
+      {/* Expanded body */}
+      {expanded && (
+        <div className="border-t border-gray-700/60 p-3 space-y-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {session.variations.map((v, i) => (
+              <VariationCard
+                key={v.id}
+                variation={v}
+                index={i}
+                onRegenerate={allDone ? onRegenerate : undefined}
+              />
+            ))}
+          </div>
+
+          {allDone && done > 0 && (
+            <BatchDownload session={session} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

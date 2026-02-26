@@ -2,12 +2,15 @@ import { useState } from 'react';
 import { ChevronDown, ChevronUp, Eye, EyeOff, Wand2 } from 'lucide-react';
 import type { PromptParams, EnvironmentType, ChangeIntensity, PhotoStyle } from '../types';
 import { buildPromptPreview, INTENSITY_META } from '../lib/prompt-builder';
+import { MODEL_COST_USD } from '../types';
 import type { BFLModel } from '../types';
 
 interface Props {
   params: PromptParams;
   model: BFLModel;
   onChange: (p: PromptParams) => void;
+  variationCount: number;
+  onVariationCountChange: (n: number) => void;
 }
 
 const ENVIRONMENTS: { value: EnvironmentType; label: string; emoji: string }[] = [
@@ -37,7 +40,9 @@ const INTENSITY_COLORS: Record<ChangeIntensity, string> = {
   major:    'bg-red-500/20    border-red-500    text-red-300',
 };
 
-export default function PromptConfig({ params, model, onChange }: Props) {
+export default function PromptConfig({ params, model, onChange, variationCount, onVariationCountChange }: Props) {
+  const costPerVariation = MODEL_COST_USD[model];
+  const costPerPhoto     = costPerVariation * variationCount;
   const [expanded, setExpanded] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
 
@@ -159,6 +164,41 @@ export default function PromptConfig({ params, model, onChange }: Props) {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Variation count */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                Variations per Photo
+              </p>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-mono font-bold text-indigo-300">{variationCount}</span>
+                <span className="text-xs text-gray-500 font-mono">
+                  ~${costPerPhoto.toFixed(3)}/photo
+                </span>
+              </div>
+            </div>
+            <input
+              type="range"
+              min={1}
+              max={50}
+              step={1}
+              value={variationCount}
+              onChange={(e) => onVariationCountChange(parseInt(e.target.value))}
+              className="w-full accent-indigo-500"
+            />
+            <div className="flex justify-between text-[10px] text-gray-600 mt-0.5">
+              <span>1 (test)</span>
+              <span>10</span>
+              <span>25</span>
+              <span>50 (bulk)</span>
+            </div>
+            {variationCount > 10 && (
+              <p className="text-[10px] text-amber-400/80 mt-1.5">
+                {variationCount} variations will use ~${costPerPhoto.toFixed(3)} per uploaded photo
+              </p>
+            )}
           </div>
 
           {/* Prompt preview toggle */}

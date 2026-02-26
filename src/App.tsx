@@ -1,11 +1,10 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Settings, GraduationCap, Layers, History } from 'lucide-react';
+import { Settings, Layers, History } from 'lucide-react';
 import { useSettings } from './hooks/useSettings';
 import SettingsModal from './components/SettingsModal';
 import PhotoUploader from './components/PhotoUploader';
-import VariationCard from './components/VariationCard';
+import JobAccordion from './components/JobAccordion';
 import StudentModule from './components/StudentModule';
-import BatchDownload from './components/BatchDownload';
 import HistoryModal from './components/HistoryModal';
 import {
   startGeneration,
@@ -13,8 +12,9 @@ import {
   downloadImageAsBlob,
   toBase64,
 } from './lib/bfl-client';
-import { VARIATION_DEFINITIONS } from './lib/variations';
+import { makeVariations } from './lib/variations';
 import { buildPrompt } from './lib/prompt-builder';
+import { createSemaphore } from './lib/semaphore';
 import {
   saveSession,
   saveSourceBlob,
@@ -24,19 +24,21 @@ import {
   loadSessions,
 } from './lib/storage';
 import PromptConfig from './components/PromptConfig';
-import type { Session, GeneratedVariation, AppView, PromptParams } from './types';
-import { MODEL_COST_USD } from './types';
+import type { Session, GeneratedVariation, PromptParams } from './types';
 
 function generateId() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+const semaphore = createSemaphore(10);
+
 export default function App() {
   const { settings, updateSettings, loaded } = useSettings();
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory]   = useState(false);
-  const [view, setView]     = useState<AppView>('upload');
-  const [session, setSession] = useState<Session | null>(null);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [studentSessionId, setStudentSessionId] = useState<string | null>(null);
+  const [variationCount, setVariationCount] = useState(3);
   const [promptParams, setPromptParams] = useState<PromptParams>({
     environment: 'general',
     intensity: 'obvious',
@@ -44,54 +46,54 @@ export default function App() {
     sceneDescription: '',
   });
 
-  // ── Restore last in-progress session on mount ────────────────────────────
+  // ── Restore sessions on mount ────────────────────────────────────────────
   useEffect(() => {
     if (!loaded) return;
     (async () => {
-      const sessions = await loadSessions();
-      const last = sessions[0];
-      if (!last) return;
+      const stored = await loadSessions();
+      if (!stored.length) return;
 
-      // Restore blob URLs for any completed variations
-      const restoredVariations = await Promise.all(
-        last.variations.map(async (v) => {
-          if (v.status === 'done' && !v.blobUrl) {
-            const blobUrl = await loadImageBlobUrl(v.id);
-            return blobUrl ? { ...v, blobUrl } : v;
-          }
-          // Mark any pending/polling variations as errored (they can't resume)
-          if (v.status === 'pending' || v.status === 'polling') {
-            return { ...v, status: 'error' as const, error: 'Interrupted — please regenerate' };
-          }
-          return v;
+      const restored = await Promise.all(
+        stored.map(async (sess) => {
+          const restoredVariations = await Promise.all(
+            sess.variations.map(async (v) => {
+              if (v.status === 'done' && !v.blobUrl) {
+                const blobUrl = await loadImageBlobUrl(v.id);
+                return blobUrl ? { ...v, blobUrl } : v;
+              }
+              if (v.status === 'pending' || v.status === 'polling') {
+                return { ...v, status: 'error' as const, error: 'Interrupted — please regenerate' };
+              }
+              return v;
+            })
+          );
+          const sourceUrl = await loadSourceBlobUrl(sess.id);
+          return {
+            ...sess,
+            sourceImageUrl: sourceUrl ?? sess.sourceImageUrl,
+            variations: restoredVariations,
+          };
         })
       );
 
-      // Restore source image blob URL
-      const sourceUrl = await loadSourceBlobUrl(last.id);
-
-      const restored: Session = {
-        ...last,
-        sourceImageUrl: sourceUrl ?? last.sourceImageUrl,
-        variations: restoredVariations,
-      };
-
-      setSession(restored);
-      setView('generating');
+      setSessions(restored);
     })();
   }, [loaded]);
 
   const updateVariation = useCallback(
     (sessionId: string, variationId: string, updates: Partial<GeneratedVariation>) => {
-      setSession((prev) => {
-        if (!prev || prev.id !== sessionId) return prev;
-        return {
-          ...prev,
-          variations: prev.variations.map((v) =>
-            v.id === variationId ? { ...v, ...updates } : v
-          ),
-        };
-      });
+      setSessions((prev) =>
+        prev.map((sess) =>
+          sess.id !== sessionId
+            ? sess
+            : {
+                ...sess,
+                variations: sess.variations.map((v) =>
+                  v.id === variationId ? { ...v, ...updates } : v
+                ),
+              }
+        )
+      );
     },
     []
   );
@@ -101,6 +103,7 @@ export default function App() {
       const seed = Math.floor(Math.random() * 999999);
       updateVariation(sess.id, variation.id, { status: 'pending', seed });
 
+      await semaphore.acquire();
       try {
         const { polling_url, cost } = await startGeneration(
           settings,
@@ -121,7 +124,6 @@ export default function App() {
 
           if (result.status === 'Ready' && result.result?.sample) {
             const { blobUrl, blob } = await downloadImageAsBlob(result.result.sample);
-            // Persist blob to IndexedDB so it survives page close
             await saveImageBlob(variation.id, blob);
             updateVariation(sess.id, variation.id, {
               status: 'done',
@@ -145,67 +147,73 @@ export default function App() {
           status: 'error',
           error: err instanceof Error ? err.message : String(err),
         });
+      } finally {
+        semaphore.release();
       }
     },
     [settings, updateVariation]
   );
 
-  const handlePhotoSelected = useCallback(
-    async (file: File, previewUrl: string) => {
+  const handleFilesSelected = useCallback(
+    async (files: File[]) => {
       if (!settings.apiKey) {
         setShowSettings(true);
         return;
       }
 
-      const variations: GeneratedVariation[] = VARIATION_DEFINITIONS.map((def) => ({
-        id: generateId(),
-        config: {
-          label: def.label,
-          prompt: buildPrompt(promptParams, settings.model),
-        },
-        status: 'idle',
-      }));
+      const newSessions: Session[] = files.map((file) => {
+        const variations: GeneratedVariation[] = makeVariations(variationCount).map((def) => ({
+          id: generateId(),
+          config: {
+            label: def.label,
+            prompt: buildPrompt(promptParams, settings.model),
+          },
+          status: 'idle' as const,
+        }));
 
-      const sess: Session = {
-        id: generateId(),
-        createdAt: new Date().toISOString(),
-        sourceImageName: file.name,
-        sourceImageUrl: previewUrl,
-        variations,
-      };
+        return {
+          id: generateId(),
+          createdAt: new Date().toISOString(),
+          sourceImageName: file.name,
+          sourceImageUrl: URL.createObjectURL(file),
+          variations,
+        };
+      });
 
-      setSession(sess);
-      setView('generating');
+      setSessions((prev) => [...newSessions, ...prev]);
 
-      // Persist source image blob so it survives page close
-      await saveSourceBlob(sess.id, file);
-      await saveSession(sess);
-
-      const base64 = await toBase64(file);
-      await Promise.all(variations.map((v) => generateVariation(sess, v, base64)));
-      await saveSession(sess);
+      // Kick off generation for each session
+      await Promise.all(
+        newSessions.map(async (sess, i) => {
+          const file = files[i];
+          await saveSourceBlob(sess.id, file);
+          await saveSession(sess);
+          const base64 = await toBase64(file);
+          await Promise.all(sess.variations.map((v) => generateVariation(sess, v, base64)));
+          await saveSession(sess);
+        })
+      );
     },
-    [settings, promptParams, generateVariation]
+    [settings, promptParams, variationCount, generateVariation]
   );
 
   const handleRegenerate = useCallback(
     async (variationId: string) => {
-      if (!session) return;
-      const variation = session.variations.find((v) => v.id === variationId);
+      const sess = sessions.find((s) => s.variations.some((v) => v.id === variationId));
+      if (!sess) return;
+      const variation = sess.variations.find((v) => v.id === variationId);
       if (!variation) return;
 
-      const imgResponse = await fetch(session.sourceImageUrl);
+      const imgResponse = await fetch(sess.sourceImageUrl);
       const blob = await imgResponse.blob();
       const base64 = await toBase64(new File([blob], 'source.jpg', { type: blob.type }));
-
-      await generateVariation(session, variation, base64);
-      await saveSession(session);
+      await generateVariation(sess, variation, base64);
+      await saveSession(sess);
     },
-    [session, generateVariation]
+    [sessions, generateVariation]
   );
 
   const handleRestoreSession = useCallback(async (restored: Session) => {
-    // Restore blob URLs from IndexedDB
     const withBlobs = await Promise.all(
       restored.variations.map(async (v) => {
         if (v.status === 'done' && !v.blobUrl) {
@@ -216,24 +224,39 @@ export default function App() {
       })
     );
     const sourceUrl = await loadSourceBlobUrl(restored.id);
-    setSession({
+    const restoredSession: Session = {
       ...restored,
       sourceImageUrl: sourceUrl ?? restored.sourceImageUrl,
       variations: withBlobs,
+    };
+    setSessions((prev) => {
+      // Replace if already present, otherwise prepend
+      const exists = prev.some((s) => s.id === restored.id);
+      return exists
+        ? prev.map((s) => (s.id === restored.id ? restoredSession : s))
+        : [restoredSession, ...prev];
     });
-    setView('generating');
     setShowHistory(false);
   }, []);
 
-  const allDone = session?.variations.every(
-    (v) => v.status === 'done' || v.status === 'error'
-  );
+  const studentSession = studentSessionId
+    ? sessions.find((s) => s.id === studentSessionId) ?? null
+    : null;
 
   if (!loaded) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <Layers size={32} className="animate-pulse text-indigo-400" />
       </div>
+    );
+  }
+
+  if (studentSession) {
+    return (
+      <StudentModule
+        session={studentSession}
+        onBack={() => setStudentSessionId(null)}
+      />
     );
   }
 
@@ -252,23 +275,6 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {session && view !== 'student' && allDone && (
-              <button
-                onClick={() => setView('student')}
-                className="flex items-center gap-1.5 text-sm text-gray-300 hover:text-white px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"
-              >
-                <GraduationCap size={15} />
-                Student View
-              </button>
-            )}
-            {session && (
-              <button
-                onClick={() => { setSession(null); setView('upload'); }}
-                className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"
-              >
-                New Session
-              </button>
-            )}
             <button
               onClick={() => setShowHistory(true)}
               className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"
@@ -293,9 +299,9 @@ export default function App() {
       </header>
 
       {/* Main */}
-      <main className="max-w-5xl mx-auto px-6 py-10">
+      <main className="max-w-5xl mx-auto px-6 py-10 space-y-8">
         {!settings.apiKey && (
-          <div className="mb-8 bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
             <div className="text-amber-400 mt-0.5 text-base">⚠</div>
             <div>
               <p className="text-amber-300 text-sm font-medium">API key required</p>
@@ -309,75 +315,39 @@ export default function App() {
           </div>
         )}
 
-        {view === 'upload' && (
-          <div>
-            <div className="mb-8 text-center">
-              <h2 className="text-2xl font-bold text-white">Generate Training Set</h2>
-              <p className="text-gray-400 mt-2 text-sm max-w-md mx-auto">
-                Upload a Hub environment photo and AI will generate variations
-                for observational training.
-              </p>
-            </div>
-            <PromptConfig params={promptParams} model={settings.model} onChange={setPromptParams} />
-            <PhotoUploader onFileSelected={handlePhotoSelected} />
+        {/* Upload + config always visible */}
+        <div>
+          <div className="mb-8 text-center">
+            <h2 className="text-2xl font-bold text-white">Generate Training Set</h2>
+            <p className="text-gray-400 mt-2 text-sm max-w-md mx-auto">
+              Upload Hub environment photos and AI will generate variations for observational training.
+            </p>
           </div>
-        )}
+          <PromptConfig
+            params={promptParams}
+            model={settings.model}
+            onChange={setPromptParams}
+            variationCount={variationCount}
+            onVariationCountChange={setVariationCount}
+          />
+          <PhotoUploader onFilesSelected={handleFilesSelected} />
+        </div>
 
-        {(view === 'generating' || view === 'review') && session && (
-          <div>
-            <div className="mb-6 flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold text-white">
-                  {allDone ? 'Generation Complete' : 'Generating Variations…'}
-                </h2>
-                <p className="text-gray-400 text-sm mt-1">
-                  {allDone
-                    ? 'Review the variations below. Download or regenerate as needed.'
-                    : 'AI is generating variations in parallel. Each takes up to 60 seconds.'}
-                </p>
-              </div>
-              <div className="shrink-0 text-right">
-                <p className="text-xs text-gray-500">Est. session cost</p>
-                <p className="text-sm font-mono font-semibold text-amber-300">
-                  ~${(MODEL_COST_USD[settings.model] * session.variations.length).toFixed(3)}
-                </p>
-                <p className="text-xs text-gray-600">{settings.model}</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
-                <div className="aspect-video bg-gray-900">
-                  <img src={session.sourceImageUrl} alt="Source" className="w-full h-full object-cover" />
-                </div>
-                <div className="p-3">
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-indigo-300">
-                    ORIGINAL
-                  </span>
-                  <p className="text-white text-sm font-medium mt-1 truncate">{session.sourceImageName}</p>
-                </div>
-              </div>
-
-              {session.variations.map((v, i) => (
-                <VariationCard
-                  key={v.id}
-                  variation={v}
-                  index={i}
-                  onRegenerate={allDone ? handleRegenerate : undefined}
-                />
-              ))}
-            </div>
-
-            {allDone && (
-              <div className="mt-6">
-                <BatchDownload session={session} />
-              </div>
-            )}
+        {/* Jobs */}
+        {sessions.length > 0 && (
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+              Jobs — {sessions.length}
+            </h3>
+            {sessions.map((sess) => (
+              <JobAccordion
+                key={sess.id}
+                session={sess}
+                onRegenerate={handleRegenerate}
+                onStudentView={() => setStudentSessionId(sess.id)}
+              />
+            ))}
           </div>
-        )}
-
-        {view === 'student' && session && (
-          <StudentModule session={session} onBack={() => setView('generating')} />
         )}
       </main>
 
