@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { Settings, Layers, History } from 'lucide-react';
 import { useSettings } from './hooks/useSettings';
 import SettingsModal from './components/SettingsModal';
@@ -21,7 +21,6 @@ import {
   saveImageBlob,
   loadImageBlobUrl,
   loadSourceBlobUrl,
-  loadSessions,
 } from './lib/storage';
 import PromptConfig from './components/PromptConfig';
 import type { Session, GeneratedVariation, PromptParams } from './types';
@@ -33,7 +32,7 @@ function generateId() {
 const semaphore = createSemaphore(10);
 
 export default function App() {
-  const { settings, updateSettings, loaded } = useSettings();
+  const { settings, updateSettings } = useSettings();
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory]   = useState(false);
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -46,39 +45,7 @@ export default function App() {
     sceneDescription: '',
   });
 
-  // ── Restore sessions on mount ────────────────────────────────────────────
-  useEffect(() => {
-    if (!loaded) return;
-    (async () => {
-      const stored = await loadSessions();
-      if (!stored.length) return;
-
-      const restored = await Promise.all(
-        stored.map(async (sess) => {
-          const restoredVariations = await Promise.all(
-            sess.variations.map(async (v) => {
-              if (v.status === 'done' && !v.blobUrl) {
-                const blobUrl = await loadImageBlobUrl(v.id);
-                return blobUrl ? { ...v, blobUrl } : v;
-              }
-              if (v.status === 'pending' || v.status === 'polling') {
-                return { ...v, status: 'error' as const, error: 'Interrupted — please regenerate' };
-              }
-              return v;
-            })
-          );
-          const sourceUrl = await loadSourceBlobUrl(sess.id);
-          return {
-            ...sess,
-            sourceImageUrl: sourceUrl ?? sess.sourceImageUrl,
-            variations: restoredVariations,
-          };
-        })
-      );
-
-      setSessions(restored);
-    })();
-  }, [loaded]);
+  // Jobs are session-only — nothing to restore on mount
 
   const updateVariation = useCallback(
     (sessionId: string, variationId: string, updates: Partial<GeneratedVariation>) => {
@@ -213,6 +180,10 @@ export default function App() {
     [sessions, generateVariation]
   );
 
+  const handleRemoveJob = useCallback((sessionId: string) => {
+    setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+  }, []);
+
   const handleRestoreSession = useCallback(async (restored: Session) => {
     const withBlobs = await Promise.all(
       restored.variations.map(async (v) => {
@@ -243,14 +214,6 @@ export default function App() {
     ? sessions.find((s) => s.id === studentSessionId) ?? null
     : null;
 
-  if (!loaded) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <Layers size={32} className="animate-pulse text-indigo-400" />
-      </div>
-    );
-  }
-
   if (studentSession) {
     return (
       <StudentModule
@@ -261,10 +224,10 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen bg-gray-950 text-white flex flex-col">
       {/* Header */}
-      <header className="border-b border-gray-800 px-6 py-4">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
+      <header className="border-b border-gray-800 px-6 py-4 shrink-0">
+        <div className="max-w-screen-xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-indigo-600 rounded-lg">
               <Layers size={18} />
@@ -278,7 +241,6 @@ export default function App() {
             <button
               onClick={() => setShowHistory(true)}
               className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"
-              title="Generation history"
             >
               <History size={15} />
               History
@@ -298,58 +260,77 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main */}
-      <main className="max-w-5xl mx-auto px-6 py-10 space-y-8">
-        {!settings.apiKey && (
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
-            <div className="text-amber-400 mt-0.5 text-base">⚠</div>
+      {/* Two-panel body */}
+      <div className="flex-1 flex overflow-hidden max-w-screen-xl mx-auto w-full">
+
+        {/* ── Left panel: config + upload ── */}
+        <aside className="w-80 shrink-0 border-r border-gray-800 flex flex-col overflow-y-auto">
+          <div className="p-5 space-y-4">
             <div>
-              <p className="text-amber-300 text-sm font-medium">API key required</p>
-              <p className="text-amber-300/70 text-sm mt-0.5">
-                Add your BFL API key in settings to start generating variations.{' '}
-                <button onClick={() => setShowSettings(true)} className="underline hover:text-amber-200">
-                  Open Settings →
-                </button>
+              <h2 className="text-sm font-semibold text-white">Generate Training Set</h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Configure options, then upload photos to queue jobs.
               </p>
             </div>
-          </div>
-        )}
 
-        {/* Upload + config always visible */}
-        <div>
-          <div className="mb-8 text-center">
-            <h2 className="text-2xl font-bold text-white">Generate Training Set</h2>
-            <p className="text-gray-400 mt-2 text-sm max-w-md mx-auto">
-              Upload Hub environment photos and AI will generate variations for observational training.
-            </p>
-          </div>
-          <PromptConfig
-            params={promptParams}
-            model={settings.model}
-            onChange={setPromptParams}
-            variationCount={variationCount}
-            onVariationCountChange={setVariationCount}
-          />
-          <PhotoUploader onFilesSelected={handleFilesSelected} />
-        </div>
+            {!settings.apiKey && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 flex items-start gap-2">
+                <span className="text-amber-400 text-sm shrink-0">⚠</span>
+                <p className="text-amber-300/80 text-xs">
+                  API key required.{' '}
+                  <button onClick={() => setShowSettings(true)} className="underline hover:text-amber-200">
+                    Open Settings
+                  </button>
+                </p>
+              </div>
+            )}
 
-        {/* Jobs */}
-        {sessions.length > 0 && (
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
-              Jobs — {sessions.length}
-            </h3>
-            {sessions.map((sess) => (
-              <JobAccordion
-                key={sess.id}
-                session={sess}
-                onRegenerate={handleRegenerate}
-                onStudentView={() => setStudentSessionId(sess.id)}
-              />
-            ))}
+            <PromptConfig
+              params={promptParams}
+              model={settings.model}
+              onChange={setPromptParams}
+              variationCount={variationCount}
+              onVariationCountChange={setVariationCount}
+            />
+
+            <PhotoUploader onFilesSelected={handleFilesSelected} />
           </div>
-        )}
-      </main>
+        </aside>
+
+        {/* ── Right panel: jobs ── */}
+        <main className="flex-1 overflow-y-auto p-5">
+          {sessions.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-center gap-3 text-gray-600">
+              <Layers size={36} className="opacity-30" />
+              <p className="text-sm">No jobs yet.<br />Upload photos on the left to get started.</p>
+              <p className="text-xs opacity-60">Jobs are cleared on page refresh.<br />Use History to access saved sessions.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  Active Jobs — {sessions.length}
+                </h3>
+                <button
+                  onClick={() => setSessions([])}
+                  className="text-xs text-gray-600 hover:text-red-400 transition-colors"
+                >
+                  Clear all
+                </button>
+              </div>
+              {sessions.map((sess) => (
+                <JobAccordion
+                  key={sess.id}
+                  session={sess}
+                  onRegenerate={handleRegenerate}
+                  onStudentView={() => setStudentSessionId(sess.id)}
+                  onRemove={() => handleRemoveJob(sess.id)}
+                />
+              ))}
+            </div>
+          )}
+        </main>
+      </div>
 
       {showSettings && (
         <SettingsModal settings={settings} onSave={updateSettings} onClose={() => setShowSettings(false)} />

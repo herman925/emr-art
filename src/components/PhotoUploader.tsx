@@ -65,7 +65,7 @@ export default function PhotoUploader({ onFilesSelected }: Props) {
   };
 
   return (
-    <div className="w-full max-w-lg mx-auto space-y-3">
+    <div className="w-full space-y-3">
       {/* Drop zone */}
       <label
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}

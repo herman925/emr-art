@@ -47,7 +47,7 @@ export default function PromptConfig({ params, model, onChange, variationCount, 
   const [showPreview, setShowPreview] = useState(false);
 
   return (
-    <div className="w-full max-w-lg mx-auto mb-6">
+    <div className="w-full mb-4">
       {/* Header toggle */}
       <button
         onClick={() => setExpanded((v) => !v)}

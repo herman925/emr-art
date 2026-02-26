@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, GraduationCap } from 'lucide-react';
+import { ChevronDown, ChevronUp, GraduationCap, X } from 'lucide-react';
 import type { Session } from '../types';
 import VariationCard from './VariationCard';
 import BatchDownload from './BatchDownload';
@@ -8,17 +8,18 @@ interface Props {
   session: Session;
   onRegenerate?: (variationId: string) => void;
   onStudentView?: () => void;
+  onRemove?: () => void;
 }
 
-export default function JobAccordion({ session, onRegenerate, onStudentView }: Props) {
+export default function JobAccordion({ session, onRegenerate, onStudentView, onRemove }: Props) {
   const total  = session.variations.length;
   const done   = session.variations.filter((v) => v.status === 'done').length;
   const errors = session.variations.filter((v) => v.status === 'error').length;
   const allDone = done + errors === total;
   const progress = total > 0 ? (done + errors) / total : 0;
 
-  // Expand while generating; collapse once fully done
-  const [expanded, setExpanded] = useState(!allDone || done > 0);
+  // Start collapsed by default
+  const [expanded, setExpanded] = useState(false);
 
   const statusColor = allDone
     ? errors === total ? 'text-red-400' : errors > 0 ? 'text-amber-400' : 'text-green-400'
@@ -59,20 +60,27 @@ export default function JobAccordion({ session, onRegenerate, onStudentView }: P
           </div>
         </div>
 
-        {/* Actions (only when done) */}
-        {allDone && done > 0 && (
-          <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-            {onStudentView && (
-              <button
-                onClick={onStudentView}
-                className="flex items-center gap-1 text-xs text-gray-400 hover:text-white px-2 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors"
-              >
-                <GraduationCap size={12} />
-                Student
-              </button>
-            )}
-          </div>
-        )}
+        {/* Actions */}
+        <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+          {allDone && done > 0 && onStudentView && (
+            <button
+              onClick={onStudentView}
+              className="flex items-center gap-1 text-xs text-gray-400 hover:text-white px-2 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors"
+            >
+              <GraduationCap size={12} />
+              Student
+            </button>
+          )}
+          {onRemove && (
+            <button
+              onClick={onRemove}
+              className="p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-gray-700 transition-colors"
+              title="Remove job"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
 
         {expanded ? (
           <ChevronUp size={15} className="text-gray-500 shrink-0" />
