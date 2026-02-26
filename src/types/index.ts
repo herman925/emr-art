@@ -1,10 +1,12 @@
 export interface AppSettings {
   apiKey: string;
   model: BFLModel;
-  // Note: FLUX.2 does NOT have an image_prompt_strength parameter.
-  // Reference image conditioning is handled internally by the model.
   outputFormat: 'jpeg' | 'png';
   safetyTolerance: number;
+  // Flex/Max only params (ignored for Pro/Dev/Klein)
+  promptUpsampling?: boolean; // default true — auto-enriches prompt
+  guidance?: number;          // 1.5–10, default 5
+  steps?: number;             // 1–50, default 50
 }
 
 // All confirmed FLUX.2 API endpoint IDs (422 response = valid endpoint)
@@ -49,6 +51,31 @@ export interface VariationConfig {
   category: VariationCategory;
   label: string;
   prompt: string;
+}
+
+// ── Dynamic prompt parameters ──────────────────────────────────────────────
+
+export type EnvironmentType =
+  | 'office'
+  | 'workshop'
+  | 'warehouse'
+  | 'lab'
+  | 'clinic'
+  | 'classroom'
+  | 'generic';
+
+export type ChangeIntensity = 'subtle' | 'moderate' | 'obvious';
+
+export type PhotoStyle =
+  | 'match-source'
+  | 'modern-digital'
+  | 'natural-light'
+  | 'indoor-fluorescent';
+
+export interface PromptParams {
+  environment: EnvironmentType;
+  intensity: ChangeIntensity;
+  photoStyle: PhotoStyle;
 }
 
 export type VariationStatus = 'idle' | 'pending' | 'polling' | 'done' | 'error';

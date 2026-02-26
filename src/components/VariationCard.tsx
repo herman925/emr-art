@@ -1,4 +1,5 @@
-import { Loader2, CheckCircle, XCircle, RefreshCw, Download } from 'lucide-react';
+import { useState } from 'react';
+import { Loader2, CheckCircle, XCircle, RefreshCw, Download, Eye, EyeOff } from 'lucide-react';
 import type { GeneratedVariation } from '../types';
 
 interface Props {
@@ -15,6 +16,8 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export default function VariationCard({ variation, index, onRegenerate }: Props) {
+  const [showPrompt, setShowPrompt] = useState(false);
+
   const downloadImage = () => {
     if (!variation.blobUrl) return;
     const a = document.createElement('a');
@@ -95,6 +98,22 @@ export default function VariationCard({ variation, index, onRegenerate }: Props)
             Retry
           </button>
         )}
+
+        {/* Prompt preview */}
+        <div className="mt-2 pt-2 border-t border-gray-700/60">
+          <button
+            onClick={() => setShowPrompt((v) => !v)}
+            className="flex items-center gap-1 text-[10px] text-gray-600 hover:text-gray-400 transition-colors"
+          >
+            {showPrompt ? <EyeOff size={10} /> : <Eye size={10} />}
+            {showPrompt ? 'Hide prompt' : 'View prompt'}
+          </button>
+          {showPrompt && (
+            <pre className="mt-1.5 text-[9px] text-gray-400 bg-gray-900 border border-gray-700 rounded-lg p-2 whitespace-pre-wrap break-words leading-relaxed font-mono max-h-32 overflow-y-auto">
+              {variation.config.prompt}
+            </pre>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -12,9 +12,11 @@ import {
   downloadImageAsBlob,
   toBase64,
 } from './lib/bfl-client';
-import { DEFAULT_VARIATIONS } from './lib/variations';
+import { VARIATION_DEFINITIONS } from './lib/variations';
+import { buildPrompt } from './lib/prompt-builder';
 import { saveSession } from './lib/storage';
-import type { Session, GeneratedVariation, AppView } from './types';
+import PromptConfig from './components/PromptConfig';
+import type { Session, GeneratedVariation, AppView, PromptParams } from './types';
 import { MODEL_COST_USD } from './types';
 
 function generateId() {
@@ -26,6 +28,11 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [view, setView] = useState<AppView>('upload');
   const [session, setSession] = useState<Session | null>(null);
+  const [promptParams, setPromptParams] = useState<PromptParams>({
+    environment: 'generic',
+    intensity: 'moderate',
+    photoStyle: 'match-source',
+  });
 
   const updateVariation = useCallback(
     (sessionId: string, variationId: string, updates: Partial<GeneratedVariation>) => {
@@ -102,9 +109,13 @@ export default function App() {
         return;
       }
 
-      const variations: GeneratedVariation[] = DEFAULT_VARIATIONS.map((config) => ({
+      const variations: GeneratedVariation[] = VARIATION_DEFINITIONS.map((def) => ({
         id: generateId(),
-        config,
+        config: {
+          category: def.category,
+          label: def.label,
+          prompt: buildPrompt(promptParams, def.category, settings.model),
+        },
         status: 'idle',
       }));
 
@@ -235,6 +246,11 @@ export default function App() {
                 for spot-the-difference observational training.
               </p>
             </div>
+            <PromptConfig
+              params={promptParams}
+              model={settings.model}
+              onChange={setPromptParams}
+            />
             <PhotoUploader onFileSelected={handlePhotoSelected} />
           </div>
         )}
