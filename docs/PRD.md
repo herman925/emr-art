@@ -1,435 +1,300 @@
-# Product Requirements Document (PRD)
-## EMR-ART: AI-Enhanced Observational Training Platform
+# Product Requirements Document
+## Event-Based Memory Test — AI Art Generation System
 
-**Document Version:** 2.0 (Consolidated)  
-**Date:** February 26, 2026  
-**Status:** Final  
-**Project ID:** PRF-2026-02-001
+**Version:** 3.0
+**Date:** February 2026
+**Status:** Current
 
 ---
 
-## Executive Summary
+## 1. Overview
 
-### Product Overview
-EMR-ART automates the creation of "spot the difference" educational modules for Hub staff training. Using AI-powered image generation (Flux 2 Pro Edit), the system generates photorealistic variations of Hub environments while maintaining structural accuracy, enabling scalable creation of observational training materials.
+### Problem
 
-### Problem Statement
-Currently, creating observational training modules requires:
-- **Manual photo editing:** 2-4 hours per module
-- **Inconsistent quality:** Human editors produce varying results
-- **Scalability bottleneck:** Cannot meet growing training demands
-- **High cost:** $50-100 per module in labor costs
+Creating observational training materials for ECE Hub staff requires photorealistic "spot the difference" image sets — an original Hub environment photo alongside several AI-generated variations that introduce controlled differences (altered equipment, changed props, different lighting). Manually editing photos takes 2–4 hours per set and produces inconsistent results.
 
 ### Solution
-Automated AI-driven image variation generation that:
-- Reduces module creation time by **90%**
-- Maintains pedagogical rigor through structural coherence
-- Scales to support **120+ schools** across multiple Hubs
-- Provides audit-ready approval workflow
 
-### Business Impact
-| Metric | Target |
-|--------|--------|
-| Time Savings | 90% reduction in manual editing |
-| Quality | <15% AI detection rate by students |
-| Scalability | 120+ schools supported |
-| Cost Savings | $15,000-25,000 annually |
+A browser-based tool that accepts Hub environment photos and automatically generates N photorealistic variations via the BFL FLUX.2 API. The coordinator configures generation parameters (environment type, change intensity, photo style), uploads photos, and reviews the results before exporting a ZIP for use in training.
+
+### Scope
+
+The system is a **single-page React application** running entirely in the browser. There is no backend server, no database, and no user accounts. All data is stored in the browser's IndexedDB via localforage.
 
 ---
 
-## 1. Product Vision
+## 2. Users
 
-### 1.1 Vision Statement
-"To automate the creation of pedagogically-rigorous observational training modules through AI-powered image generation, enabling scalable, high-quality safety and operational training across all Hub locations."
-
-### 1.2 Strategic Goals
-1. **Automation First:** Eliminate 90% of manual photo editing tasks
-2. **Quality Assurance:** Maintain structural accuracy while introducing controlled variations
-3. **Operational Excellence:** Streamline workflow from photo upload to student delivery
-4. **Scalability:** Support rapid expansion to new Hub locations
-5. **Pedagogical Integrity:** Ensure AI variations maintain training effectiveness
-
----
-
-## 2. Target Users
-
-### 2.1 Primary Personas
-
-#### Hub Coordinator (Primary)
-- **Role:** Uploads session photos and manages content
-- **Demographics:** Non-technical, education-focused
-- **Goals:** Quick, easy photo upload; confidence in AI quality
-- **Pain Points:** Limited technical skills, time constraints
-- **Usage Frequency:** 2-5 uploads per week
-
-#### Training Manager (Secondary)
-- **Role:** Reviews and approves AI-generated variations
-- **Demographics:** Quality-focused, pedagogical expertise
-- **Goals:** Ensure training effectiveness, maintain standards
-- **Pain Points:** Quality consistency, approval bottlenecks
-- **Usage Frequency:** Daily reviews during training cycles
-
-#### Student (End User)
-- **Role:** Consumes observational training modules
-- **Demographics:** Varied ages, diverse backgrounds
-- **Goals:** Learn to identify safety/environmental issues
-- **Pain Points:** Poor quality images, unrealistic variations
-- **Usage Frequency:** 1-2 training sessions per month
+| Persona | Role | Usage |
+|---|---|---|
+| Hub Coordinator | Uploads photos, configures generation, reviews output | Primary — 2–5 uploads per week |
+| Training Manager | Reviews accepted/rejected variations, downloads ZIP | Secondary — during training cycles |
 
 ---
 
 ## 3. Functional Requirements
 
-### 3.1 Core Features
+### 3.1 Photo Upload
 
-#### FR-1: Photo Upload and Ingestion
-**Priority:** P0 (Critical)
+- Accept JPEG/PNG files via drag-and-drop or file picker
+- Support multi-file upload (batch queue)
+- Display upload progress and per-job status
+- Store source photo blob in IndexedDB; recover it on page refresh
 
-- FR-1.1: Accept JPEG/PNG formats (max 20MB per image)
-- FR-1.2: Capture required metadata: Session ID, Hub Location, Date
-- FR-1.3: Validate image resolution (minimum 1024x1024 pixels)
-- FR-1.4: Auto-orient images based on EXIF data
-- FR-1.5: Provide upload progress indicator
-- FR-1.6: Store original images in secure cloud storage
+### 3.2 Generation Configuration
 
-**Acceptance Criteria:**
-- [ ] User can upload photo via Jotform in < 30 seconds
-- [ ] All required fields are validated before submission
-- [ ] Upload success rate > 99%
+**Prompt parameters** (set once, applied to all uploads in that session):
 
-#### FR-2: AI Image Variation Generation
-**Priority:** P0 (Critical)
+| Parameter | Options |
+|---|---|
+| Environment Type | General Hub, Art & Craft, Reading, Blocks, Dramatic Play, Science, Sensory, Music, Outdoor |
+| Change Intensity | Minimal · Subtle · Moderate · Vivid · Obvious · Sweeping · Major |
+| Photo Style | Match Source · Modern Digital · Natural Light · Fluorescent Indoor · Golden Hour · Overcast Soft · Bright & Airy · High Contrast |
+| Scene Description | Optional free-text hint for the AI |
+| Variation Count | 1–50 per photo |
 
-- FR-2.1: Generate exactly **3 variations** per original photo
-- FR-2.2: Maintain structural coherence score > 0.90
-- FR-2.3: Apply variation prompts from predefined framework:
-  - **Variation 1:** Safety equipment modification
-  - **Variation 2:** Thematic props alteration
-  - **Variation 3:** Environmental color changes
-- FR-2.4: Process images within 60 seconds per variation
-- FR-2.5: Support batch processing (minimum 5 photos simultaneously)
+**Model settings** (persisted in localStorage):
 
-**Technical Parameters:**
-```yaml
-flux_2_pro_edit:
-  image_to_image_strength: 0.35  # Preserves structure
-  creativity_scale: 0.2          # Limits AI freedom
-  structure_coherence: "high"    # Enforces preservation
-  output_format: "jpeg"
-  output_quality: 95
-```
+| Setting | Options | Default |
+|---|---|---|
+| FLUX.2 Model | flux-2-pro, flux-2-max, flux-2-flex, flux-2-dev, flux-2-klein-* | flux-2-pro |
+| Output Scale | 0.5×, 1×, 2×, 3×, 4× relative to source dimensions | 1× |
+| Output Format | JPEG, PNG | JPEG |
+| Safety Tolerance | 0–6 | 2 |
 
-#### FR-3: Style Reference Layer
-**Priority:** P1 (High)
+Output dimensions are derived per-photo: source dimensions × scale, snapped to the nearest 32px, clamped to [64, 2048].
 
-- FR-3.1: Create and store master style reference image set
-- FR-3.2: Apply style transfer to all generated variations
-- FR-3.3: Maintain consistent lighting across different Hub locations
-- FR-3.4: Preserve color accuracy within ±5% variance
+### 3.3 Jobs View
 
-#### FR-4: Audit and Approval Dashboard
-**Priority:** P0 (Critical)
+- Two sections: **Active Jobs** (current session) and **Previous Jobs** (restored from IndexedDB on mount)
+- Each job shows: source photo thumbnail, filename, progress bar, done/total count
+- Variations pending/polling on page refresh are shown as errors with a retry option
+- Per-job preview modal: curtain-drag and side-by-side comparison modes
+- Per-job remove; "Clear all" for active jobs
 
-- FR-4.1: Display original photo alongside 3 variations
-- FR-4.2: Highlight detected changes (overlay markup)
-- FR-4.3: Provide side-by-side comparison view
-- FR-4.4: Enable "Approve" / "Regenerate" / "Edit Prompt" actions
-- FR-4.5: Track approval status (Pending, Approved, Rejected)
-- FR-4.6: Allow bulk approval for all 3 variations
-- FR-4.7: Log all approval actions with user ID and timestamp
+### 3.4 Album View
 
-#### FR-5: Student Module Integration
-**Priority:** P0 (Critical)
+Flat grid of all completed variations across all sessions.
 
-- FR-5.1: Serve images via CDN for fast loading
-- FR-5.2: Display 4-image grid (1 real + 3 variations) in random order
-- FR-5.3: Support responsive design (mobile, tablet, desktop)
-- FR-5.4: Track student responses and accuracy
-- FR-5.5: Provide immediate feedback on selection
-- FR-5.6: Support accessibility standards (WCAG 2.1 AA)
+**Search:** filter by source photo filename (case-insensitive substring).
+
+**Group By:** source photo · environment · intensity · review status · star rating.
+
+**Filters:**
+- Review status: all / accepted / rejected / unreviewed
+- Star rating: operator (any / > / ≥ / = / ≤ / <) + value (1–5)
+- Environment, intensity, photo style (independent dropdowns)
+
+**Thumbnail size:** slider from 60 px to 600 px min-width per cell.
+
+Each thumbnail overlays: source photo (bottom-left), flag badge (top-left), star badge (top-right). Hover shows variation label and filename.
+
+### 3.5 Lightbox
+
+Fullscreen view opened by clicking any album thumbnail.
+
+- Main image fills available viewport space (object-contain)
+- Right panel: original photo, pixel dimensions (W × H), generation config (environment, intensity, scene description, model)
+- Review controls: Accept / Reject toggle buttons, 1–5 star rating
+- Keyboard: `←` / `→` navigate, `Y` accept, `N` reject, `1`–`5` stars, `Esc` close
+- Counter: current / total
+
+### 3.6 Review System
+
+Per-variation (not per-session):
+
+| Field | Values |
+|---|---|
+| Flag | `accepted` · `rejected` · unset |
+| Rating | 1–5 stars · unrated |
+
+Both are persisted immediately via `saveSession()`.
+
+### 3.7 Bulk Export
+
+ZIP download filtered by flag and/or star rating. Each session folder in the ZIP contains the source photo and all matching variation images.
+
+### 3.8 Theme
+
+Light and dark mode toggle in the header. Default is dark. Preference is stored in `localStorage` and applied before first paint (inline script in `index.html`) to prevent flash.
 
 ---
 
 ## 4. Non-Functional Requirements
 
-### 4.1 Performance
+### Performance
 
 | Metric | Target |
-|--------|--------|
-| Photo upload | < 30 seconds |
-| Variation generation | < 60 seconds per variation |
-| Dashboard load | < 2 seconds |
-| Student module image load | < 2 seconds |
-| API response time | < 500ms (95th percentile) |
+|---|---|
+| Concurrent API calls | Up to 10 (semaphore-limited) |
+| Poll interval | 2 seconds |
+| Max poll attempts | 60 (2-minute timeout) |
+| Page load (cold) | < 2 seconds |
+| IndexedDB session cap | 100 sessions (LRU eviction) |
 
-### 4.2 Reliability
+### Reliability
 
-| Metric | Target |
-|--------|--------|
-| System uptime | 99.9% |
-| Data durability | 99.99% |
-| Backup frequency | Every 6 hours |
-| Backup retention | 30 days |
+- Interrupted generations (pending/polling at page close) are shown as errors on restore with a retry option
+- Image blobs written by old buggy sessions (status=idle, blob exists) are automatically recovered as `done` on restore
+- Session saves are serialised per-session to prevent concurrent IndexedDB read-modify-write races
 
-### 4.3 Security
+### Storage
 
-- All API endpoints require authentication
-- Image uploads validated for format/size
-- Rate limiting: 100 requests per minute per user
-- Audit logs for all approval actions
-- Data encryption at rest (AES-256) and in transit (TLS 1.3)
+All data lives in the browser's IndexedDB. No cloud storage. Users are responsible for exporting and backing up generated images.
 
 ---
 
-## 5. Technical Architecture
-
-### 5.1 System Architecture
+## 5. System Architecture
 
 ```
-┌─────────────────┐
-│   Jotform       │
-│   (Upload UI)   │
-└────────┬────────┘
-         │ Webhook
-         ▼
-┌─────────────────┐
-│   API Gateway   │
-│   (Load Balancer)│
-└────────┬────────┘
-         │
-    ┌────┴────┐
-    ▼         ▼
-┌────────┐ ┌────────┐
-│ Node.js│ │ Flask  │
-│  API   │ │  API   │
-└───┬────┘ └───┬────┘
-    └─────┬────┘
+Browser (React SPA)
+│
+├── UI Layer
+│   ├── App.tsx               — layout, session state, generation orchestration
+│   ├── PromptConfig          — generation parameter controls
+│   ├── PhotoUploader         — drag-and-drop / file picker
+│   ├── JobAccordion          — per-job status, preview modal
+│   ├── AlbumView             — grid, search, filters, group-by
+│   ├── AlbumLightbox         — fullscreen review, keyboard nav
+│   ├── ImageCompareModal     — curtain + side-by-side compare
+│   ├── BulkExportModal       — ZIP download with filter
+│   └── SettingsModal         — API key, model, scale, format
+│
+├── Logic Layer
+│   ├── lib/bfl-client.ts     — FLUX.2 API: startGeneration, pollResult, downloadImageAsBlob
+│   ├── lib/prompt-builder.ts — buildPrompt(), INTENSITY_META, ENV_DISPLAY
+│   ├── lib/variations.ts     — makeVariations()
+│   ├── lib/semaphore.ts      — createSemaphore(10)
+│   └── lib/storage.ts        — IndexedDB via localforage
+│
+├── State
+│   ├── activeSessions[]      — jobs created this page load (React state)
+│   └── prevSessions[]        — restored from IndexedDB on mount (React state)
+│
+└── Persistence (IndexedDB)
+    ├── emr-art               — session metadata (status, flags, ratings, config)
+    ├── emr-art-images        — generated variation blobs
+    └── emr-art-sources       — source photo blobs
+```
+
+### API Flow
+
+```
+handleFilesSelected(files)
+  │
+  ├── getImageDimensions(file)   → natural W × H
+  ├── computeOutputSize()        → scale × dims, snap to 32
+  ├── saveSourceBlob()           → IndexedDB
+  ├── saveSession()              → IndexedDB (initial idle state)
+  └── for each variation:
+        generateVariation(sess, variation, base64, w, h)
           │
-    ┌─────┴──────┐
-    ▼            ▼
-┌────────┐  ┌──────────┐
-│ Flux 2 │  │ Database │
-│  API   │  │(PostgreSQL)│
-└────────┘  └──────────┘
-    │            │
-    ▼            ▼
-┌────────────────┐
-│  Cloud Storage │
-│  (S3/GCS)      │
-└────────┬───────┘
-         │ CDN
-         ▼
-┌─────────────────┐
-│  Student Module │
-│  (Frontend)     │
-└─────────────────┘
+          ├── semaphore.acquire()
+          ├── startGeneration()  → POST /v1/{model}
+          ├── pollResult()       → GET polling_url (every 2s, up to 60×)
+          ├── downloadImageAsBlob()
+          ├── saveImageBlob()    → IndexedDB
+          ├── applyUpdate()      → module-level cache
+          ├── updateVariation()  → React state (UI update)
+          ├── enqueueSave()      → serialised IndexedDB write
+          └── semaphore.release()
 ```
 
-### 5.2 Technology Stack
+### Save Race Prevention
 
-| Layer | Technology |
-|-------|-----------|
-| **Frontend** | React 18+ / TypeScript / Tailwind CSS |
-| **Backend** | Node.js 20+ / Express |
-| **Database** | PostgreSQL 14+ |
-| **Cache** | Redis |
-| **Storage** | AWS S3 / CloudFront CDN |
-| **AI API** | Flux 2 Pro Edit (via Replicate or BFL) |
-| **Auth** | JWT / OAuth 2.0 |
+```
+variationUpdates: Map<sessId, Map<varId, Partial<GeneratedVariation>>>
+saveLocks:        Map<sessId, Promise<void>>
 
-### 5.3 Data Model
+enqueueSave(sess):
+  prev = saveLocks.get(sess.id) ?? resolved
+  next = prev.then(() => saveSession(buildSessionForSave(sess)))
+  saveLocks.set(sess.id, next)
 
-```sql
--- Sessions
-CREATE TABLE sessions (
-    id SERIAL PRIMARY KEY,
-    session_number INTEGER NOT NULL,
-    hub_location VARCHAR(255) NOT NULL,
-    session_date DATE NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Original Photos
-CREATE TABLE original_photos (
-    id SERIAL PRIMARY KEY,
-    session_id INTEGER REFERENCES sessions(id),
-    photo_url TEXT NOT NULL,
-    upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    uploaded_by VARCHAR(255),
-    metadata JSONB
-);
-
--- Generated Variations
-CREATE TABLE variations (
-    id SERIAL PRIMARY KEY,
-    original_photo_id INTEGER REFERENCES original_photos(id),
-    variation_number INTEGER NOT NULL, -- 1, 2, or 3
-    variation_url TEXT NOT NULL,
-    prompt_used TEXT,
-    generation_params JSONB,
-    status VARCHAR(50) DEFAULT 'pending',
-    reviewed_by VARCHAR(255),
-    reviewed_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Student Responses
-CREATE TABLE student_responses (
-    id SERIAL PRIMARY KEY,
-    session_id INTEGER REFERENCES sessions(id),
-    student_id VARCHAR(255),
-    selected_image INTEGER,
-    is_correct BOOLEAN,
-    time_to_completion INTEGER,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+buildSessionForSave(sess):
+  merges variationUpdates cache onto sess.variations
+  → always reflects all updates completed so far
 ```
 
 ---
 
-## 6. Implementation Roadmap
+## 6. Data Model
 
-### Phase 1: MVP (Weeks 1-4)
-**Goal:** Core infrastructure and basic functionality
+### Session (stored in IndexedDB, blobUrls stripped)
 
-**Deliverables:**
-- [ ] Set up cloud infrastructure (AWS/GCP)
-- [ ] Implement database schema
-- [ ] Build Node.js/Flask API
-- [ ] Integrate Flux 2 API
-- [ ] Create basic photo upload endpoint
-- [ ] Implement variation generation (single photo)
-- [ ] Set up cloud storage (S3)
-- [ ] Basic logging and monitoring
+```typescript
+interface Session {
+  id: string;                    // random 8-char alphanumeric
+  createdAt: string;             // ISO timestamp
+  sourceImageName: string;       // original filename
+  sourceImageUrl: string;        // object URL (transient; restored from blob on load)
+  variations: GeneratedVariation[];
+  promptParams?: PromptParams;   // config used for this session
+  model?: string;                // BFL model ID used
+}
 
-### Phase 2: Enhanced Features (Weeks 5-8)
-**Goal:** Complete core workflow
+interface GeneratedVariation {
+  id: string;
+  config: { label: string; prompt: string };
+  status: 'idle' | 'pending' | 'polling' | 'done' | 'error';
+  pollingUrl?: string;
+  imageUrl?: string;             // CDN URL (expires in ~10 min; blob is the durable copy)
+  blobUrl?: string;              // transient — re-created from IndexedDB blob on restore
+  error?: string;
+  seed?: number;
+  cost?: number;                 // USD
+  flag?: 'accepted' | 'rejected';
+  rating?: number;               // 1–5
+}
+```
 
-**Deliverables:**
-- [ ] Jotform webhook integration
-- [ ] Batch variation generation (3 per photo)
-- [ ] Style reference layer implementation
-- [ ] Approval dashboard (MVP)
-- [ ] Session-based image retrieval
-- [ ] Student module frontend (MVP)
-- [ ] Email notifications
+### AppSettings (stored in localStorage)
 
-### Phase 3: Scale & Optimize (Weeks 9-12)
-**Goal:** Polish and optimize
-
-**Deliverables:**
-- [ ] Advanced dashboard features (filters, bulk actions)
-- [ ] Performance optimization
-- [ ] Analytics dashboard
-- [ ] User management and SSO
-- [ ] Mobile-responsive design
-- [ ] Accessibility improvements
-- [ ] Comprehensive testing
-
----
-
-## 7. Success Metrics
-
-### 7.1 Operational Metrics
-
-| Metric | Target | Measurement |
-|--------|--------|-------------|
-| Variation Generation Time | < 60 seconds | API logs |
-| System Uptime | 99.9% | Monitoring |
-| Photo Processing Success | > 98% | Database |
-| Approval Rate (First Attempt) | > 80% | Dashboard |
-| API Response Time | < 500ms | APM |
-
-### 7.2 Quality Metrics
-
-| Metric | Target | Measurement |
-|--------|--------|-------------|
-| Visual Plausibility | < 15% detection | Student surveys |
-| Structural Accuracy | 100% | Manual audit |
-| Style Consistency | > 90% match | Automated scoring |
-
-### 7.3 Business Metrics
-
-| Metric | Target | Measurement |
-|--------|--------|-------------|
-| Time Savings | 90% reduction | Time tracking |
-| Cost Savings | $15K-25K annually | Financial analysis |
-| Module Creation Rate | 50 modules/week | Database count |
+```typescript
+interface AppSettings {
+  apiKey: string;
+  model: BFLModel;
+  outputFormat: 'jpeg' | 'png';
+  safetyTolerance: number;       // 0–6
+  outputScale: number;           // 0.5 | 1 | 2 | 3 | 4
+  promptUpsampling?: boolean;    // Flex/Max only
+  guidance?: number;             // Flex/Max only, 1.5–10
+  steps?: number;                // Flex/Max only, 1–50
+}
+```
 
 ---
 
-## 8. Risk Assessment
+## 7. Deployment
 
-| Risk | Probability | Impact | Mitigation |
-|------|------------|--------|------------|
-| Flux API rate limits | Medium | High | Queue system, fallback |
-| Low structural coherence | Medium | High | Parameter tuning, QA |
-| Staff adoption resistance | Medium | High | Training, gradual rollout |
-| Cost overruns | Medium | Medium | Monitoring, budget alerts |
+| Environment | URL | Notes |
+|---|---|---|
+| Production | https://herman925.github.io/emr-art/ | GitHub Pages, Cloudflare Worker proxy required |
+| Local dev | http://localhost:5173 | Direct API calls, no proxy needed |
 
----
+### Cloudflare Worker (production only)
 
-## 9. Budget Estimation
-
-### 9.1 Development Costs (One-Time)
-| Item | Estimate |
-|------|----------|
-| Backend Development | 120 hours |
-| Frontend Development | 80 hours |
-| QA & Testing | 40 hours |
-| Project Management | 30 hours |
-| **Total** | **270 hours** |
-
-### 9.2 Operational Costs (Monthly)
-| Item | Cost |
-|------|------|
-| Flux 2 API (100 variations) | $200-500 |
-| AWS S3 Storage | $20 |
-| AWS RDS (PostgreSQL) | $50 |
-| Redis Cloud | $30 |
-| **Total** | **$300-600/month** |
+BFL API does not emit CORS headers. All requests (generation, polling, image download) are routed through a Cloudflare Worker. The app sets `VITE_API_PROXY` to the Worker base URL. The Worker forwards the original BFL hostname via `x-bfl-host` to handle regional polling subdomains.
 
 ---
 
-## 10. Appendices
+## 8. Out of Scope
 
-### Appendix A: Glossary
+The following were considered in earlier iterations and are explicitly excluded from the current product:
 
-| Term | Definition |
-|------|------------|
-| **Hub** | Physical training location |
-| **Variation** | AI-generated "incorrect" version |
-| **Style Reference** | Master visual template |
-| **Structure Coherence** | Metric for structural similarity |
-| **Image-to-Image Strength** | Flux parameter controlling modification |
-
-### Appendix B: Reference Materials
-
-- Flux API Documentation: https://docs.bfl.ml
-- Jotform API: https://api.jotform.com
-- AWS Best Practices: https://aws.amazon.com/architecture/well-architected/
-- WCAG 2.1 Guidelines: https://www.w3.org/WAI/WCAG21/quickref/
+- Backend server, database, or cloud storage
+- User accounts or authentication
+- Student-facing "spot the difference" game view
+- Jotform integration
+- Push notifications or email
+- Mobile app
 
 ---
 
-## Document Approval
+## Document History
 
-| Role | Name | Date |
-|------|------|------|
-| Product Owner | _____________ | _______ |
-| Technical Lead | _____________ | _______ |
-| QA Lead | _____________ | _______ |
-| Stakeholder | _____________ | _______ |
-
----
-
-**Document History:**
-
-| Version | Date | Author | Changes |
-|---------|------|--------|---------|
-| 1.0 | 2026-02-25 | Mission Control | Initial PRD |
-| 2.0 | 2026-02-26 | Mission Control | Consolidated PRD + PRF |
-
----
-
-*End of Document*
+| Version | Date | Changes |
+|---|---|---|
+| 1.0 | 2026-02-25 | Initial PRD (Jotform/Node/PostgreSQL architecture) |
+| 2.0 | 2026-02-26 | Consolidated PRD — browser-only React SPA |
+| 3.0 | 2026-02-26 | Full rewrite to match current implementation: album view, lightbox, group-by, search, theme toggle, output scale, save race fix |

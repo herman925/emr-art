@@ -1,198 +1,202 @@
-# Flux API Quick Reference Guide
+# BFL FLUX.2 API — Quick Reference
 
-## 🚀 Quick Start
+## Get Started
 
-### 1. Get API Key
-1. Visit https://dashboard.bfl.ai
-2. Register and confirm email
-3. Navigate to **API → Keys**
-4. Click **Add Key**
-5. **Copy immediately** (only shown once!)
+### 1. API Key
+1. Go to [dashboard.bfl.ai](https://dashboard.bfl.ai)
+2. Register and verify your email
+3. Navigate to **API → Keys → Add Key**
+4. Copy immediately — shown only once
 
 ### 2. Add Credits
-- Go to **API → Credits**
-- Click **Add Credits**
-- Pay via Stripe
+- **API → Credits → Add Credits** (Stripe)
 - **1 credit = $0.01 USD**
 
-### 3. First API Call
+---
 
-```python
-import os
-import requests
-import time
+## Endpoints
 
-api_key = os.environ.get("BFL_API_KEY")
-
-# Submit request
-response = requests.post(
-    'https://api.bfl.ai/v1/flux-2-pro',
-    headers={
-        'accept': 'application/json',
-        'x-key': api_key,
-        'Content-Type': 'application/json',
-    },
-    json={
-        'prompt': 'A serene landscape with mountains',
-        'width': 1440,
-        'height': 2048
-    }
-)
-
-data = response.json()
-polling_url = data['polling_url']
-
-# Poll for result
-while True:
-    time.sleep(0.5)
-    result = requests.get(
-        polling_url,
-        headers={'accept': 'application/json', 'x-key': api_key}
-    ).json()
-    
-    if result['status'] == 'Ready':
-        print(f"Image ready: {result['result']['sample']}")
-        break
+```
+Base URL:  https://api.bfl.ai/v1
+Regional:  https://api.eu.bfl.ai/v1   (GDPR)
+           https://api.us.bfl.ai/v1
 ```
 
-## 🎯 Model Selection Quick Guide
+All models follow the same two-step request/poll pattern:
 
-| Use Case | Recommended Model | Price | Why |
-|----------|------------------|-------|-----|
-| **Production Apps** | FLUX.2 [pro] | from $0.03 | Best balance of quality/speed |
-| **High Volume** | FLUX.2 [klein] 4B | from $0.014 | Lowest cost |
-| **Maximum Quality** | FLUX.2 [flex] | $0.05 | Highest quality output |
-| **Image Editing** | FLUX.1 Kontext [pro] | $0.04 | Text-based editing |
-| **Ultra-High Res** | FLUX1.1 [pro] Ultra | $0.06 | Up to 4MP images |
-| **Development** | FLUX.2 [dev] | Free | Local, non-commercial |
-
-## 📡 API Endpoints
-
-### Primary Endpoint
 ```
-https://api.bfl.ai
+POST  /v1/{model}           → { polling_url, cost, ... }
+GET   {polling_url}         → { status, result: { sample } }
 ```
-- Global load balancing
-- Automatic failover
-- **Always use polling_url from response**
 
-### Regional Endpoints
-- **EU:** `https://api.eu.bfl.ai` (GDPR compliant)
-- **US:** `https://api.us.bfl.ai`
+---
 
-## ⚠️ Critical Limits
+## Models
 
-| Limit Type | Value | Action |
-|------------|-------|--------|
-| **Concurrent Requests** | 24 max | Implement queue |
-| **Kontext Max** | 6 max | Lower concurrency |
-| **Image Expiration** | 10 minutes | Download immediately |
-| **CORS** | Not supported | Download & re-serve |
+| Model ID | Family | Steps | Cost/image |
+|---|---|---|---|
+| `flux-2-pro` | Pro | — | $0.040 |
+| `flux-2-max` | Pro | — | $0.060 |
+| `flux-2-flex` | Pro | 1–50 | $0.050 |
+| `flux-2-dev` | Pro | — | $0.025 |
+| `flux-pro-1.1` | Pro (legacy) | — | $0.040 |
+| `flux-pro-1.1-ultra` | Pro (legacy) | — | $0.060 |
+| `flux-2-klein-4b` | Klein distilled | 4 | $0.014 |
+| `flux-2-klein-9b` | Klein distilled | 4 | $0.020 |
+| `flux-2-klein-base-4b` | Klein base | 50 | $0.014 |
+| `flux-2-klein-base-9b` | Klein base | 50 | $0.020 |
 
-## 🛠️ Best Practices Checklist
+**Klein models** are distilled (4-step, real-time speed) or base (50-step, CFG). Max 4 input images.
+**Flex/Max** expose `guidance` (1.5–10), `steps` (1–50), and `prompt_upsampling`.
+**Pro/Dev/legacy** take up to 8 input images; no guidance/steps controls.
 
-- [ ] Store API key in environment variables
-- [ ] Use global endpoint `api.bfl.ai`
-- [ ] Implement exponential backoff for 429 errors
-- [ ] Download images immediately upon completion
-- [ ] Store images in your own infrastructure/CDN
-- [ ] Handle all status types (Ready, Error, Failed)
-- [ ] Monitor credit balance
-- [ ] Implement proper error handling for 402 (insufficient credits)
-- [ ] Use descriptive API key names
-- [ ] Test with small images first
+---
 
-## 💰 Pricing Quick Reference
+## Request Bodies
 
-### FLUX.2 (Megapixel-based)
-- **Klein 4B:** from $0.014/image
-- **Klein 9B:** from $0.015/image
-- **Pro:** from $0.030/image
-- **Flex:** $0.050/image
-
-### FLUX.1 (Fixed pricing)
-- **Kontext Pro:** $0.04/image
-- **Kontext Max:** $0.08/image
-- **1.1 Pro:** $0.04/image
-- **1.1 Pro Ultra:** $0.06/image
-- **Fill Pro:** $0.05/image
-
-**Note:** Batch requests multiply cost by number of images.
-
-## 🔧 Common Parameters
-
-### Required
-- `prompt` (string): Text description of desired image
-
-### Optional
-- `width` (integer): Image width (default varies by model)
-- `height` (integer): Image height (default varies by model)
-- `seed` (integer): For reproducibility
-- `steps` (integer): Number of generation steps (15-50)
-- `guidance` (float): Guidance scale (1.5-10)
-- `safety_tolerance` (integer): 0-6 (0=strict, 6=lenient)
-- `output_format` (string): "jpeg" or "png"
-
-## 📊 Response Format
-
-### Initial Request
+### Pro / Dev / Legacy
 ```json
 {
-  "id": "request_id_here",
-  "polling_url": "https://...",
-  "cost": 0.03,
-  "input_mp": 2.95,
-  "output_mp": 2.95
+  "prompt": "string",
+  "input_image": "base64_string",
+  "seed": 42,
+  "width": 1024,
+  "height": 768,
+  "safety_tolerance": 2,
+  "output_format": "jpeg"
 }
 ```
 
-### Polling Result
+### Flex / Max (adds guidance + steps)
 ```json
 {
+  "prompt": "string",
+  "input_image": "base64_string",
+  "seed": 42,
+  "width": 1024,
+  "height": 768,
+  "safety_tolerance": 2,
+  "output_format": "jpeg",
+  "prompt_upsampling": true,
+  "guidance": 5,
+  "steps": 50
+}
+```
+
+### Klein (max 4 input images, no guidance/steps)
+```json
+{
+  "prompt": "string",
+  "input_image": "base64_string",
+  "seed": 42,
+  "width": 1024,
+  "height": 768,
+  "safety_tolerance": 2,
+  "output_format": "jpeg"
+}
+```
+
+> **Important:** Always send explicit `width` and `height`. Klein defaults to 336×256 if omitted. Dimensions must be multiples of 32.
+
+---
+
+## Response Format
+
+### Initial response
+```json
+{
+  "id": "...",
+  "polling_url": "https://api.us2.bfl.ai/v1/get_result?id=...",
+  "cost": 4,
+  "input_mp": 0.79,
+  "output_mp": 0.79
+}
+```
+`cost` is in raw credits (divide by 100 for USD).
+
+### Poll response
+```json
+{
+  "id": "...",
   "status": "Ready",
   "result": {
-    "sample": "https://delivery-eu.bfl.ai/..."
+    "sample": "https://delivery.bfl.ai/..."
   }
 }
 ```
 
-## 🐛 Common Errors
+Possible statuses: `Pending` · `Ready` · `Error` · `Request Moderated` · `Content Moderated`
 
-| Status Code | Meaning | Solution |
-|-------------|---------|----------|
-| **402** | Insufficient credits | Add credits at dashboard.bfl.ai |
-| **429** | Rate limit exceeded | Wait and retry with exponential backoff |
-| **422** | Validation error | Check input parameters |
-| **500-503** | Server error | Retry with exponential backoff |
-
-## 📚 Useful Links
-
-- **Documentation:** https://docs.bfl.ml
-- **API Reference:** https://api.bfl.ai/openapi.json
-- **Playground:** https://playground.bfl.ai
-- **Pricing:** https://bfl.ai/pricing
-- **Dashboard:** https://dashboard.bfl.ai
-- **Support:** flux@blackforestlabs.ai
-- **GitHub:** https://github.com/black-forest-labs/flux
-
-## 🎨 Prompting Tips
-
-1. **Be specific:** "A golden retriever puppy sitting on a red blanket in a sunny park" > "A dog"
-2. **Include style:** "in the style of impressionist painting" or "photorealistic"
-3. **Specify lighting:** "golden hour lighting", "dramatic shadows"
-4. **Add details:** "highly detailed", "8k resolution", "professional photography"
-5. **Use composition terms:** "close-up shot", "wide angle", "bird's eye view"
-
-## 🔐 Security Reminders
-
-- ✅ Store API keys in environment variables
-- ✅ Use different keys for dev/staging/production
-- ✅ Regenerate keys if compromised
-- ❌ Never commit keys to git
-- ❌ Never expose keys in client-side code
-- ❌ Never share keys publicly
+> **Image expiry:** Result URLs expire in ~10 minutes. Download and store the blob immediately.
 
 ---
 
-**Last Updated:** February 26, 2026  
-**Version:** 1.0
+## Polling Pattern (JavaScript)
+
+```typescript
+async function pollUntilReady(apiKey: string, pollingUrl: string, maxAttempts = 60) {
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+    const res = await fetch(pollingUrl, { headers: { 'x-key': apiKey } });
+    const data = await res.json();
+
+    if (data.status === 'Ready') return data.result.sample;
+    if (['Error', 'Request Moderated', 'Content Moderated'].includes(data.status)) {
+      throw new Error(`Generation failed: ${data.status}`);
+    }
+  }
+  throw new Error('Timed out');
+}
+```
+
+---
+
+## CORS
+
+The BFL API does not emit CORS headers. **Direct calls from a browser will fail.**
+
+In production, proxy all requests (generation, polling, image download) through a server or Cloudflare Worker:
+- Forward `x-key` for auth
+- Forward `x-bfl-host` for regional polling subdomains (e.g. `api.us2.bfl.ai`)
+
+For local development with Node/Vite proxy, CORS restrictions do not apply.
+
+---
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Concurrent requests | 24 max |
+| Image URL expiry | ~10 minutes |
+| Dimension multiple | Must be divisible by 32 |
+| Klein max input images | 4 |
+| Pro/Flex/Dev max input images | 8 |
+
+---
+
+## Error Codes
+
+| HTTP Status | Meaning | Fix |
+|---|---|---|
+| `402` | Insufficient credits | Add credits at dashboard.bfl.ai |
+| `422` | Validation error | Check prompt, dimensions, param ranges |
+| `429` | Rate limit | Back off and retry |
+| `500–503` | Server error | Retry with exponential backoff |
+
+---
+
+## Useful Links
+
+| Resource | URL |
+|---|---|
+| Documentation | https://docs.bfl.ml |
+| API reference | https://api.bfl.ai/openapi.json |
+| Dashboard | https://dashboard.bfl.ai |
+| Pricing | https://bfl.ai/pricing |
+| Playground | https://playground.bfl.ai |
+| Support | flux@blackforestlabs.ai |
+
+---
+
+*Last updated: February 2026*
