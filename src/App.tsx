@@ -5,6 +5,7 @@ import SettingsModal from './components/SettingsModal';
 import PhotoUploader from './components/PhotoUploader';
 import VariationCard from './components/VariationCard';
 import StudentModule from './components/StudentModule';
+import BatchDownload from './components/BatchDownload';
 import {
   startGeneration,
   pollResult,
@@ -14,6 +15,7 @@ import {
 import { DEFAULT_VARIATIONS } from './lib/variations';
 import { saveSession } from './lib/storage';
 import type { Session, GeneratedVariation, AppView } from './types';
+import { MODEL_COST_USD } from './types';
 
 function generateId() {
   return Math.random().toString(36).slice(2, 10);
@@ -234,15 +236,25 @@ export default function App() {
 
         {(view === 'generating' || view === 'review') && session && (
           <div>
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold text-white">
-                {allDone ? 'Generation Complete' : 'Generating Variations…'}
-              </h2>
-              <p className="text-gray-400 text-sm mt-1">
-                {allDone
-                  ? 'Review the variations below. Download or regenerate as needed.'
-                  : 'AI is generating 3 variations in parallel. Each takes up to 60 seconds.'}
-              </p>
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-white">
+                  {allDone ? 'Generation Complete' : 'Generating Variations…'}
+                </h2>
+                <p className="text-gray-400 text-sm mt-1">
+                  {allDone
+                    ? 'Review the variations below. Download or regenerate as needed.'
+                    : 'AI is generating 3 variations in parallel. Each takes up to 60 seconds.'}
+                </p>
+              </div>
+              {/* Session cost estimate */}
+              <div className="shrink-0 text-right">
+                <p className="text-xs text-gray-500">Est. session cost</p>
+                <p className="text-sm font-mono font-semibold text-amber-300">
+                  ~${(MODEL_COST_USD[settings.model] * 3).toFixed(3)}
+                </p>
+                <p className="text-xs text-gray-600">{settings.model}</p>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -274,6 +286,12 @@ export default function App() {
                 />
               ))}
             </div>
+
+            {allDone && (
+              <div className="mt-6">
+                <BatchDownload session={session} />
+              </div>
+            )}
           </div>
         )}
 

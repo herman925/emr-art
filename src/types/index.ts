@@ -8,9 +8,17 @@ export interface AppSettings {
 
 export type BFLModel =
   | 'flux-pro-1.1'
+  | 'flux-pro-1.1-ultra'
   | 'flux-pro'
-  | 'flux-dev'
-  | 'flux-pro-1.1-ultra';
+  | 'flux-dev';
+
+// Cost per image in USD (from BFL pricing page)
+export const MODEL_COST_USD: Record<BFLModel, number> = {
+  'flux-pro-1.1': 0.04,
+  'flux-pro-1.1-ultra': 0.06,
+  'flux-pro': 0.05,
+  'flux-dev': 0.025,
+};
 
 export type VariationCategory = 'safety' | 'equipment' | 'props' | 'environment';
 

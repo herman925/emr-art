@@ -82,6 +82,21 @@ export async function downloadImageAsBlob(url: string): Promise<string> {
   return URL.createObjectURL(blob);
 }
 
+export interface BFLCreditsResponse {
+  credits: number;
+}
+
+export async function fetchCredits(apiKey: string): Promise<BFLCreditsResponse> {
+  const response = await fetch(`${BFL_BASE}/get_credits`, {
+    headers: { 'X-Key': apiKey },
+  });
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Credits check failed ${response.status}: ${err}`);
+  }
+  return response.json();
+}
+
 export function toBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
