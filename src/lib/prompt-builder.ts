@@ -106,7 +106,7 @@ const HARD_RULES = [
 
 export function buildPrompt(params: PromptParams, model: BFLModel): string {
   const envLabel      = ENV_LABEL[params.environment];
-  const { instruction } = INTENSITY_CHANGE[params.intensity];
+  const { instruction } = INTENSITY_CHANGE[params.intensity ?? 'obvious'];
   const styleDesc     = STYLE_DESCRIPTOR[params.photoStyle];
   const sceneNote     = params.sceneDescription.trim()
     ? `The reference image shows: ${params.sceneDescription.trim()}.`
@@ -134,7 +134,7 @@ export function buildPrompt(params: PromptParams, model: BFLModel): string {
 export function buildPromptPreview(params: PromptParams, model: BFLModel): string {
   if (isKleinModel(model)) return buildPrompt(params, model);
   const envLabel      = ENV_LABEL[params.environment];
-  const { instruction } = INTENSITY_CHANGE[params.intensity];
+  const { instruction } = INTENSITY_CHANGE[params.intensity ?? 'obvious'];
   const styleDesc     = STYLE_DESCRIPTOR[params.photoStyle];
   const sceneNote     = params.sceneDescription.trim()
     ? `The reference image shows: ${params.sceneDescription.trim()}.`

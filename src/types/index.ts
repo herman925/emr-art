@@ -86,7 +86,7 @@ export type PhotoStyle =
 
 export interface PromptParams {
   environment: EnvironmentType;
-  intensity: ChangeIntensity;
+  intensity?: ChangeIntensity; // per-variation now; kept optional for backwards compat
   photoStyle: PhotoStyle;
   sceneDescription: string; // optional free-text describing what's in the photo
 }

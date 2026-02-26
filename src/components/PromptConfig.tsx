@@ -1,16 +1,17 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Eye, EyeOff, Wand2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, EyeOff, Wand2, Plus, Minus } from 'lucide-react';
 import type { PromptParams, EnvironmentType, ChangeIntensity, PhotoStyle } from '../types';
 import { buildPromptPreview, INTENSITY_META } from '../lib/prompt-builder';
 import { MODEL_COST_USD } from '../types';
 import type { BFLModel } from '../types';
+import { totalVariations } from '../lib/variations';
 
 interface Props {
   params: PromptParams;
   model: BFLModel;
   onChange: (p: PromptParams) => void;
-  variationCount: number;
-  onVariationCountChange: (n: number) => void;
+  intensityDist: Partial<Record<ChangeIntensity, number>>;
+  onIntensityDistChange: (d: Partial<Record<ChangeIntensity, number>>) => void;
 }
 
 const ENVIRONMENTS: { value: EnvironmentType; label: string; emoji: string }[] = [
@@ -36,15 +37,38 @@ const PHOTO_STYLES: { value: PhotoStyle; label: string; desc: string }[] = [
   { value: 'high-contrast',      label: 'High Contrast',       desc: 'Editorial · bold shadows' },
 ];
 
-export default function PromptConfig({ params, model, onChange, variationCount, onVariationCountChange }: Props) {
-  const costPerVariation = MODEL_COST_USD[model];
-  const costPerPhoto     = costPerVariation * variationCount;
+const MAX_TOTAL = 100;
+const MAX_PER_INTENSITY = 50;
+
+export default function PromptConfig({ params, model, onChange, intensityDist, onIntensityDistChange }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
 
-  const selectedEnv  = ENVIRONMENTS.find((e) => e.value === params.environment)!;
+  const total = totalVariations(intensityDist);
+  const costPerVariation = MODEL_COST_USD[model];
+  const costPerPhoto = costPerVariation * total;
+
+  const selectedEnv   = ENVIRONMENTS.find((e) => e.value === params.environment)!;
   const selectedStyle = PHOTO_STYLES.find((s) => s.value === params.photoStyle)!;
-  const intensityMeta = INTENSITY_META[params.intensity];
+
+  // How many intensity levels have a non-zero count
+  const activeIntensities = Object.entries(intensityDist).filter(([, n]) => (n ?? 0) > 0);
+
+  function setCount(intensity: ChangeIntensity, delta: number | 'set', rawValue?: number) {
+    const current = intensityDist[intensity] ?? 0;
+    let next: number;
+    if (delta === 'set') {
+      next = Math.max(0, Math.min(MAX_PER_INTENSITY, rawValue ?? 0));
+    } else {
+      next = Math.max(0, Math.min(MAX_PER_INTENSITY, current + delta));
+    }
+    // Enforce overall cap
+    const newTotal = total - current + next;
+    if (newTotal > MAX_TOTAL) next = current + (MAX_TOTAL - total);
+    if (next < 0) next = 0;
+
+    onIntensityDistChange({ ...intensityDist, [intensity]: next });
+  }
 
   return (
     <div className="w-full mb-4">
@@ -64,21 +88,32 @@ export default function PromptConfig({ params, model, onChange, variationCount, 
         )}
       </button>
 
-      {/* Summary pills — always visible below the toggle */}
+      {/* Summary pills — shown when collapsed */}
       {!expanded && (
         <div className="flex flex-wrap gap-1.5 mt-2 px-1">
           <span className="text-xs px-2.5 py-1 rounded-full bg-gray-800 border border-gray-700 text-gray-300">
             {selectedEnv.emoji} {selectedEnv.label}
           </span>
           <span className="text-xs px-2.5 py-1 rounded-full bg-gray-800 border border-gray-700 text-gray-300">
-            {intensityMeta.icon} {intensityMeta.label}
-          </span>
-          <span className="text-xs px-2.5 py-1 rounded-full bg-gray-800 border border-gray-700 text-gray-300">
             {selectedStyle.label}
           </span>
-          <span className="text-xs px-2.5 py-1 rounded-full bg-indigo-900/40 border border-indigo-800 text-indigo-300">
-            ×{variationCount}
+          {/* ×N pill — solid indigo so contrast works in both light and dark mode */}
+          <span className="text-xs px-2.5 py-1 rounded-full bg-indigo-600 border border-indigo-500 text-white font-semibold">
+            ×{total}
           </span>
+          {activeIntensities.slice(0, 3).map(([intensity, n]) => {
+            const meta = INTENSITY_META[intensity as ChangeIntensity];
+            return (
+              <span key={intensity} className="text-xs px-2.5 py-1 rounded-full bg-gray-800 border border-gray-700 text-gray-300">
+                {meta.icon} {meta.label} ×{n}
+              </span>
+            );
+          })}
+          {activeIntensities.length > 3 && (
+            <span className="text-xs px-2.5 py-1 rounded-full bg-gray-800 border border-gray-700 text-gray-500">
+              +{activeIntensities.length - 3} more
+            </span>
+          )}
           {params.sceneDescription && (
             <span className="text-xs px-2.5 py-1 rounded-full bg-gray-800 border border-gray-700 text-gray-400 max-w-[180px] truncate">
               "{params.sceneDescription}"
@@ -90,7 +125,81 @@ export default function PromptConfig({ params, model, onChange, variationCount, 
       {expanded && (
         <div className="mt-2 bg-gray-800/60 border border-gray-700 rounded-xl p-4 space-y-5">
 
-          {/* Environment — dropdown */}
+          {/* ── Variation Distribution ── */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                Variation Distribution
+              </label>
+              <div className="flex items-center gap-2">
+                <span className={`text-sm font-mono font-bold ${total >= MAX_TOTAL ? 'text-amber-400' : 'text-indigo-300'}`}>
+                  {total}
+                </span>
+                <span className="text-xs text-gray-500">/ {MAX_TOTAL} total</span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              {(Object.entries(INTENSITY_META) as [ChangeIntensity, { label: string; icon: string; instruction: string }][]).map(([intensity, meta]) => {
+                const count = intensityDist[intensity] ?? 0;
+                const atCap = total >= MAX_TOTAL && count === 0;
+                return (
+                  <div key={intensity} className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
+                    count > 0
+                      ? 'bg-indigo-600/10 border-indigo-500/40'
+                      : 'bg-gray-700/30 border-gray-700'
+                  }`}>
+                    <span className="text-base shrink-0 w-5 text-center">{meta.icon}</span>
+                    <span className={`text-sm flex-1 font-medium ${count > 0 ? 'text-white' : 'text-gray-400'}`}>
+                      {meta.label}
+                    </span>
+                    <p className="text-[10px] text-gray-600 hidden sm:block w-32 truncate">{meta.instruction}</p>
+                    {/* Stepper */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => setCount(intensity, -1)}
+                        disabled={count === 0}
+                        className="w-6 h-6 rounded flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <Minus size={11} />
+                      </button>
+                      <input
+                        type="number"
+                        min={0}
+                        max={MAX_PER_INTENSITY}
+                        value={count}
+                        onChange={(e) => setCount(intensity, 'set', parseInt(e.target.value) || 0)}
+                        className="w-10 text-center text-sm font-mono font-semibold bg-gray-900 border border-gray-600 rounded text-white focus:outline-none focus:border-indigo-500 py-0.5"
+                      />
+                      <button
+                        onClick={() => setCount(intensity, +1)}
+                        disabled={atCap}
+                        className="w-6 h-6 rounded flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <Plus size={11} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {total === 0 && (
+              <p className="text-xs text-amber-400/80 mt-2">Set at least one variation to generate.</p>
+            )}
+            {total >= MAX_TOTAL && (
+              <p className="text-xs text-amber-400/80 mt-2">
+                Maximum {MAX_TOTAL} variations reached.
+              </p>
+            )}
+            {total > 0 && (
+              <p className="text-xs text-gray-500 mt-2">
+                ~${costPerPhoto.toFixed(3)} per uploaded photo
+              </p>
+            )}
+          </div>
+
+          {/* ── Environment ── */}
           <div>
             <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
               Environment Type
@@ -111,33 +220,7 @@ export default function PromptConfig({ params, model, onChange, variationCount, 
             </div>
           </div>
 
-          {/* Change intensity — icon buttons */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
-              Change Intensity
-            </label>
-            <div className="grid grid-cols-1 gap-1.5">
-              {(Object.entries(INTENSITY_META) as [ChangeIntensity, { label: string; icon: string; instruction: string }][]).map(([value, meta]) => (
-                <button
-                  key={value}
-                  onClick={() => onChange({ ...params, intensity: value })}
-                  className={`text-left px-3 py-2.5 rounded-lg border transition-colors flex items-start gap-2.5 ${
-                    params.intensity === value
-                      ? 'bg-indigo-600/20 border-indigo-500 text-white'
-                      : 'bg-gray-700/40 border-gray-600 text-gray-400 hover:border-gray-500 hover:text-gray-200'
-                  }`}
-                >
-                  <span className="text-base leading-none mt-0.5 shrink-0">{meta.icon}</span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold leading-none">{meta.label}</p>
-                    <p className="text-[11px] mt-1 opacity-60 leading-snug line-clamp-2">{meta.instruction}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Scene description */}
+          {/* ── Scene description ── */}
           <div>
             <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
               Scene Description
@@ -153,7 +236,7 @@ export default function PromptConfig({ params, model, onChange, variationCount, 
             <p className="text-xs text-gray-600 mt-1">Helps the AI understand your scene when generating variations.</p>
           </div>
 
-          {/* Photo style */}
+          {/* ── Photo style ── */}
           <div>
             <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
               Photo Style
@@ -176,40 +259,7 @@ export default function PromptConfig({ params, model, onChange, variationCount, 
             </div>
           </div>
 
-          {/* Variation count */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                Variations per Photo
-              </label>
-              <div className="flex items-center gap-2">
-                <span className="text-xl font-mono font-bold text-indigo-300">{variationCount}</span>
-                <span className="text-xs text-gray-500 font-mono">~${costPerPhoto.toFixed(3)}/photo</span>
-              </div>
-            </div>
-            <input
-              type="range"
-              min={1}
-              max={50}
-              step={1}
-              value={variationCount}
-              onChange={(e) => onVariationCountChange(parseInt(e.target.value))}
-              className="w-full accent-indigo-500"
-            />
-            <div className="flex justify-between text-xs text-gray-600 mt-0.5">
-              <span>1</span>
-              <span>10</span>
-              <span>25</span>
-              <span>50</span>
-            </div>
-            {variationCount > 10 && (
-              <p className="text-xs text-amber-400/80 mt-1.5">
-                {variationCount} variations ≈ ${costPerPhoto.toFixed(3)} per uploaded photo
-              </p>
-            )}
-          </div>
-
-          {/* Prompt preview */}
+          {/* ── Prompt preview ── */}
           <div className="border-t border-gray-700 pt-4">
             <button
               onClick={() => setShowPreview((v) => !v)}
@@ -219,13 +269,23 @@ export default function PromptConfig({ params, model, onChange, variationCount, 
               {showPreview ? 'Hide prompt preview' : 'Preview prompt sent to API'}
             </button>
             {showPreview && (
-              <div className="mt-3">
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                  Prompt sent to API (same for all variations, different seeds)
+              <div className="mt-3 space-y-2">
+                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                  Sample prompts (one per intensity level, different seeds per copy)
                 </p>
-                <pre className="text-[11px] text-gray-300 bg-gray-900 border border-gray-700 rounded-lg p-3 whitespace-pre-wrap break-words leading-relaxed font-mono max-h-48 overflow-y-auto">
-                  {buildPromptPreview(params, model)}
-                </pre>
+                {(Object.entries(INTENSITY_META) as [ChangeIntensity, { label: string; icon: string; instruction: string }][])
+                  .filter(([intensity]) => (intensityDist[intensity] ?? 0) > 0)
+                  .map(([intensity, meta]) => (
+                    <div key={intensity}>
+                      <p className="text-[10px] text-gray-500 mb-1">{meta.icon} {meta.label}</p>
+                      <pre className="text-[11px] text-gray-300 bg-gray-900 border border-gray-700 rounded-lg p-3 whitespace-pre-wrap break-words leading-relaxed font-mono max-h-32 overflow-y-auto">
+                        {buildPromptPreview({ ...params, intensity }, model)}
+                      </pre>
+                    </div>
+                  ))}
+                {totalVariations(intensityDist) === 0 && (
+                  <p className="text-xs text-gray-600">Set at least one variation above to preview prompts.</p>
+                )}
               </div>
             )}
           </div>

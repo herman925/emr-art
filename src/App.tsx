@@ -14,7 +14,7 @@ import {
   toBase64,
 } from './lib/bfl-client';
 import { makeVariations } from './lib/variations';
-import { buildPrompt } from './lib/prompt-builder';
+import { buildPrompt, INTENSITY_META } from './lib/prompt-builder';
 import { createSemaphore } from './lib/semaphore';
 import {
   saveSession,
@@ -26,7 +26,7 @@ import {
   deleteSession,
 } from './lib/storage';
 import PromptConfig from './components/PromptConfig';
-import type { Session, GeneratedVariation, PromptParams, VariationFlag } from './types';
+import type { Session, GeneratedVariation, PromptParams, VariationFlag, ChangeIntensity } from './types';
 
 function generateId() {
   return Math.random().toString(36).slice(2, 10);
@@ -99,10 +99,12 @@ export default function App() {
   // Previous jobs (loaded from IndexedDB on mount)
   const [prevSessions, setPrevSessions]     = useState<Session[]>([]);
 
-  const [variationCount, setVariationCount] = useState(3);
+  // Intensity distribution: how many variations to generate per intensity level
+  const [intensityDist, setIntensityDist] = useState<Partial<Record<ChangeIntensity, number>>>({
+    obvious: 3,
+  });
   const [promptParams, setPromptParams] = useState<PromptParams>({
     environment: 'general',
-    intensity: 'obvious',
     photoStyle: 'match-source',
     sceneDescription: '',
   });
@@ -218,11 +220,17 @@ export default function App() {
         sourceImageUrl: URL.createObjectURL(file),
         promptParams,
         model: settings.model,
-        variations: makeVariations(variationCount).map((def) => ({
-          id: generateId(),
-          config: { label: def.label, prompt: buildPrompt(promptParams, settings.model) },
-          status: 'idle' as const,
-        })),
+        variations: makeVariations(intensityDist).map((def) => {
+          const meta = INTENSITY_META[def.intensity];
+          const label = def.totalForIntensity > 1
+            ? `${meta.icon} ${meta.label} ${def.indexWithinIntensity + 1}/${def.totalForIntensity}`
+            : `${meta.icon} ${meta.label}`;
+          return {
+            id: generateId(),
+            config: { label, prompt: buildPrompt({ ...promptParams, intensity: def.intensity }, settings.model) },
+            status: 'idle' as const,
+          };
+        }),
       }));
 
       setActiveSessions((prev) => [...newSessions, ...prev]);
@@ -245,7 +253,7 @@ export default function App() {
         })
       );
     },
-    [settings, promptParams, variationCount, generateVariation]
+    [settings, promptParams, intensityDist, generateVariation]
   );
 
   const handleRegenerate = useCallback(
@@ -388,8 +396,8 @@ export default function App() {
               params={promptParams}
               model={settings.model}
               onChange={setPromptParams}
-              variationCount={variationCount}
-              onVariationCountChange={setVariationCount}
+              intensityDist={intensityDist}
+              onIntensityDistChange={setIntensityDist}
             />
           </div>
         </aside>
