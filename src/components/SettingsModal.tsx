@@ -338,30 +338,6 @@ export default function SettingsModal({ settings, onSave, onClose }: Props) {
             )}
           </div>
 
-          {/* ── Image Strength ───────────────────────── */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">
-              Image Strength:{' '}
-              <span className="text-indigo-400 font-mono">{form.imageStrength}</span>
-            </label>
-            <input
-              type="range"
-              min="0.1"
-              max="0.9"
-              step="0.05"
-              value={form.imageStrength}
-              onChange={(e) => setForm({ ...form, imageStrength: parseFloat(e.target.value) })}
-              className="w-full accent-indigo-500"
-            />
-            <div className="flex justify-between text-xs text-gray-500 mt-0.5">
-              <span>More faithful to source</span>
-              <span>More AI freedom</span>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              0.35 recommended — preserves room structure while allowing controlled changes.
-            </p>
-          </div>
-
           {/* ── Output Format ────────────────────────── */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1.5">

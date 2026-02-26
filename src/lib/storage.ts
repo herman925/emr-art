@@ -7,7 +7,6 @@ const SESSIONS_KEY = 'emr-art:sessions';
 export const DEFAULT_SETTINGS: AppSettings = {
   apiKey: '',
   model: 'flux-2-pro',
-  imageStrength: 0.35,
   outputFormat: 'jpeg',
   safetyTolerance: 2,
 };

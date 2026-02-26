@@ -1,7 +1,8 @@
 export interface AppSettings {
   apiKey: string;
   model: BFLModel;
-  imageStrength: number;
+  // Note: FLUX.2 does NOT have an image_prompt_strength parameter.
+  // Reference image conditioning is handled internally by the model.
   outputFormat: 'jpeg' | 'png';
   safetyTolerance: number;
 }
