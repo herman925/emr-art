@@ -338,6 +338,77 @@ export default function SettingsModal({ settings, onSave, onClose }: Props) {
             )}
           </div>
 
+          {/* ── Flex/Max Advanced Controls ───────────── */}
+          {(form.model === 'flux-2-flex' || form.model === 'flux-2-max') && (
+            <div className="bg-gray-800/60 border border-indigo-500/20 rounded-xl p-4 space-y-4">
+              <p className="text-xs font-semibold text-indigo-300 uppercase tracking-wider">
+                Advanced — {form.model} only
+              </p>
+
+              {/* Prompt Upsampling */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-300 font-medium">Prompt Upsampling</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Auto-enriches prompt via Mistral (recommended)</p>
+                </div>
+                <button
+                  onClick={() => setForm({ ...form, promptUpsampling: !(form.promptUpsampling ?? true) })}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${
+                    (form.promptUpsampling ?? true) ? 'bg-indigo-600' : 'bg-gray-600'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                      (form.promptUpsampling ?? true) ? 'translate-x-5' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Guidance */}
+              <div>
+                <div className="flex justify-between mb-1.5">
+                  <p className="text-sm text-gray-300 font-medium">Guidance</p>
+                  <span className="text-sm font-mono text-indigo-300">{form.guidance ?? 5}</span>
+                </div>
+                <input
+                  type="range"
+                  min={1.5}
+                  max={10}
+                  step={0.5}
+                  value={form.guidance ?? 5}
+                  onChange={(e) => setForm({ ...form, guidance: parseFloat(e.target.value) })}
+                  className="w-full accent-indigo-500"
+                />
+                <div className="flex justify-between text-xs text-gray-600 mt-0.5">
+                  <span>1.5 (loose)</span>
+                  <span>10 (strict)</span>
+                </div>
+              </div>
+
+              {/* Steps */}
+              <div>
+                <div className="flex justify-between mb-1.5">
+                  <p className="text-sm text-gray-300 font-medium">Steps</p>
+                  <span className="text-sm font-mono text-indigo-300">{form.steps ?? 50}</span>
+                </div>
+                <input
+                  type="range"
+                  min={1}
+                  max={50}
+                  step={1}
+                  value={form.steps ?? 50}
+                  onChange={(e) => setForm({ ...form, steps: parseInt(e.target.value) })}
+                  className="w-full accent-indigo-500"
+                />
+                <div className="flex justify-between text-xs text-gray-600 mt-0.5">
+                  <span>1 (fast)</span>
+                  <span>50 (max quality)</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ── Output Format ────────────────────────── */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1.5">

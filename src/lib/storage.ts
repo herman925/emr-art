@@ -9,6 +9,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   model: 'flux-2-pro',
   outputFormat: 'jpeg',
   safetyTolerance: 2,
+  promptUpsampling: true,
+  guidance: 5,
+  steps: 50,
 };
 
 export async function loadSettings(): Promise<AppSettings> {
