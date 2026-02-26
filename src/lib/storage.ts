@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   model: 'flux-2-pro',
   outputFormat: 'jpeg',
   safetyTolerance: 2,
+  outputScale: 1,
   promptUpsampling: true,
   guidance: 5,
   steps: 50,

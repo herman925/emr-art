@@ -32,6 +32,22 @@ function generateId() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+/** Read the natural pixel dimensions of an image File. */
+function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { resolve({ width: img.naturalWidth, height: img.naturalHeight }); URL.revokeObjectURL(url); };
+    img.onerror = () => { resolve({ width: 1024, height: 768 }); URL.revokeObjectURL(url); };
+    img.src = url;
+  });
+}
+
+/** Round n to the nearest multiple of 32, clamped to [64, 2048]. */
+function snapTo32(n: number): number {
+  return Math.min(2048, Math.max(64, Math.round(n / 32) * 32));
+}
+
 const semaphore = createSemaphore(10);
 
 // Module-level cache: sessionId → Map<variationId, accumulated updates>
@@ -147,13 +163,13 @@ export default function App() {
 
   // ── Generation ───────────────────────────────────────────────────────────
   const generateVariation = useCallback(
-    async (sess: Session, variation: GeneratedVariation, sourceBase64: string) => {
+    async (sess: Session, variation: GeneratedVariation, sourceBase64: string, width: number, height: number) => {
       const seed = Math.floor(Math.random() * 999999);
       updateVariation(sess.id, variation.id, { status: 'pending', seed });
 
       await semaphore.acquire();
       try {
-        const { polling_url, cost } = await startGeneration(settings, sourceBase64, variation.config, seed);
+        const { polling_url, cost } = await startGeneration(settings, sourceBase64, variation.config, seed, width, height);
         updateVariation(sess.id, variation.id, {
           status: 'polling',
           pollingUrl: polling_url,
@@ -219,7 +235,12 @@ export default function App() {
           await saveSourceBlob(sess.id, file);
           await saveSession(sess); // saves initial idle state — will be overwritten as each variation completes
           const base64 = await toBase64(file);
-          await Promise.all(sess.variations.map((v) => generateVariation(sess, v, base64)));
+          // Compute output dimensions from source image × scale factor, snapped to multiples of 32
+          const scale = settings.outputScale ?? 1;
+          const { width: srcW, height: srcH } = await getImageDimensions(file);
+          const outW = snapTo32(srcW * scale);
+          const outH = snapTo32(srcH * scale);
+          await Promise.all(sess.variations.map((v) => generateVariation(sess, v, base64, outW, outH)));
           // No final saveSession(sess) here — each generateVariation saves its own terminal state
         })
       );
@@ -235,8 +256,13 @@ export default function App() {
       if (!variation) return;
       const imgResponse = await fetch(sess.sourceImageUrl);
       const blob = await imgResponse.blob();
-      const base64 = await toBase64(new File([blob], 'source.jpg', { type: blob.type }));
-      await generateVariation(sess, variation, base64);
+      const file = new File([blob], 'source.jpg', { type: blob.type });
+      const base64 = await toBase64(file);
+      const scale = settings.outputScale ?? 1;
+      const { width: srcW, height: srcH } = await getImageDimensions(file);
+      const outW = snapTo32(srcW * scale);
+      const outH = snapTo32(srcH * scale);
+      await generateVariation(sess, variation, base64, outW, outH);
       await saveSession(sess);
     },
     [allSessions, generateVariation]

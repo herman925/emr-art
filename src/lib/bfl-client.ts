@@ -89,11 +89,16 @@ export async function startGeneration(
   settings: AppSettings,
   sourceBase64: string,
   variation: VariationConfig,
-  seed: number
+  seed: number,
+  width: number,
+  height: number,
 ): Promise<BFLInitialResponse> {
   const endpoint = `${BFL_BASE}/${settings.model}`;
 
   let body: AnyFluxBody;
+
+  const w = width;
+  const h = height;
 
   if (isKleinModel(settings.model)) {
     // Klein: max 4 input images, no guidance/steps/prompt_upsampling
@@ -101,6 +106,8 @@ export async function startGeneration(
       prompt: variation.prompt,
       input_image: sourceBase64,
       seed,
+      width: w,
+      height: h,
       safety_tolerance: settings.safetyTolerance,
       output_format: settings.outputFormat,
     } satisfies Flux2KleinBody;
@@ -110,6 +117,8 @@ export async function startGeneration(
       prompt: variation.prompt,
       input_image: sourceBase64,
       seed,
+      width: w,
+      height: h,
       safety_tolerance: settings.safetyTolerance,
       output_format: settings.outputFormat,
       prompt_upsampling: settings.promptUpsampling ?? true,
@@ -122,6 +131,8 @@ export async function startGeneration(
       prompt: variation.prompt,
       input_image: sourceBase64,
       seed,
+      width: w,
+      height: h,
       safety_tolerance: settings.safetyTolerance,
       output_format: settings.outputFormat,
     } satisfies Flux2ProBody;

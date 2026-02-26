@@ -409,6 +409,35 @@ export default function SettingsModal({ settings, onSave, onClose }: Props) {
             </div>
           )}
 
+          {/* ── Output Scale ─────────────────────────── */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1.5">
+              Output Scale
+              <span className="ml-2 text-xs text-gray-500 font-normal">— relative to each uploaded photo's dimensions</span>
+            </label>
+            <div className="flex gap-2">
+              {([0.5, 1, 2, 3, 4] as number[]).map((scale) => {
+                const active = (form.outputScale ?? 1) === scale;
+                return (
+                  <button
+                    key={scale}
+                    onClick={() => setForm({ ...form, outputScale: scale })}
+                    className={`flex-1 py-2.5 rounded-lg border text-sm font-semibold transition-colors ${
+                      active
+                        ? 'bg-indigo-600/20 border-indigo-500 text-white'
+                        : 'bg-gray-800/60 border-gray-700 text-gray-400 hover:border-gray-500 hover:text-white'
+                    }`}
+                  >
+                    {scale}×
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-gray-600 mt-1.5">
+              e.g. a 1920 × 1080 photo at 2× → 3840 × 2160 output. Dimensions are snapped to multiples of 32.
+            </p>
+          </div>
+
           {/* ── Output Format ────────────────────────── */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1.5">

@@ -3,6 +3,7 @@ export interface AppSettings {
   model: BFLModel;
   outputFormat: 'jpeg' | 'png';
   safetyTolerance: number;
+  outputScale: number;   // multiplier applied to the source image's dimensions (0.5 | 1 | 2 | 3 | 4)
   // Flex/Max only params (ignored for Pro/Dev/Klein)
   promptUpsampling?: boolean; // default true — auto-enriches prompt
   guidance?: number;          // 1.5–10, default 5
