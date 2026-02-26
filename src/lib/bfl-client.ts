@@ -16,6 +16,7 @@ interface BFLRequestBody {
 interface BFLInitialResponse {
   id: string;
   polling_url: string;
+  cost?: number; // actual credits charged (1 credit = $0.01 USD)
 }
 
 interface BFLPollingResponse {
@@ -57,7 +58,8 @@ export async function startGeneration(
     throw new Error(`BFL API error ${response.status}: ${error}`);
   }
 
-  return response.json();
+  const data: BFLInitialResponse = await response.json();
+  return data;
 }
 
 export async function pollResult(
@@ -87,7 +89,7 @@ export interface BFLCreditsResponse {
 }
 
 export async function fetchCredits(apiKey: string): Promise<BFLCreditsResponse> {
-  const response = await fetch(`${BFL_BASE}/get_credits`, {
+  const response = await fetch(`${BFL_BASE}/credits`, {
     headers: { 'X-Key': apiKey },
   });
   if (!response.ok) {

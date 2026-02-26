@@ -158,10 +158,14 @@ export default function SettingsModal({ settings, onSave, onClose }: Props) {
     }
   };
 
+  const keyFormatOk = !form.apiKey.trim() || form.apiKey.trim().startsWith('bfl_');
+
   const costPerImage = MODEL_COST_USD[form.model];
   const costPerSession = costPerImage * 3;
+  // API returns credits (1 credit = $0.01 USD), convert to USD for display
+  const balanceUSD = balance.status === 'ok' ? balance.credits / 100 : null;
   const sessionsRemaining =
-    balance.status === 'ok' ? Math.floor(balance.credits / costPerSession) : null;
+    balanceUSD != null ? Math.floor(balanceUSD / costPerSession) : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 overflow-y-auto">
@@ -203,20 +207,28 @@ export default function SettingsModal({ settings, onSave, onClose }: Props) {
               Stored only in your browser's local storage. Never sent anywhere except api.bfl.ai.
             </p>
 
+            {/* Key format warning */}
+            {!keyFormatOk && (
+              <div className="flex items-center gap-1.5 text-xs text-amber-400 mt-1.5">
+                <AlertCircle size={12} />
+                <span>BFL API keys start with <span className="font-mono">bfl_</span> — get yours at dashboard.bfl.ai</span>
+              </div>
+            )}
+
             {/* Balance check */}
             <div className="mt-2 flex items-center gap-2 flex-wrap">
               <button
                 onClick={checkBalance}
-                disabled={!form.apiKey.trim() || balance.status === 'loading'}
+                disabled={!form.apiKey.trim() || !keyFormatOk || balance.status === 'loading'}
                 className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-gray-300 hover:text-white transition-colors"
               >
                 <RefreshCw size={12} className={balance.status === 'loading' ? 'animate-spin' : ''} />
                 {balance.status === 'loading' ? 'Checking…' : 'Check Balance'}
               </button>
-              {balance.status === 'ok' && (
+              {balance.status === 'ok' && balanceUSD != null && (
                 <div className="flex items-center gap-1.5 text-xs text-green-300">
                   <CheckCircle size={13} />
-                  <span className="font-mono font-medium">${balance.credits.toFixed(2)} remaining</span>
+                  <span className="font-mono font-medium">${balanceUSD.toFixed(2)} remaining</span>
                   {sessionsRemaining !== null && (
                     <span className="text-green-400/60">(~{sessionsRemaining} sessions)</span>
                   )}
@@ -316,11 +328,11 @@ export default function SettingsModal({ settings, onSave, onClose }: Props) {
                 <p className="text-xs text-gray-500 mt-0.5">10 sessions</p>
               </div>
             </div>
-            {balance.status === 'ok' && (
+            {balance.status === 'ok' && balanceUSD != null && (
               <div className="mt-3 pt-3 border-t border-gray-700 flex justify-between text-xs">
                 <span className="text-gray-400">Your balance</span>
                 <span className="text-green-300 font-mono font-medium">
-                  ${balance.credits.toFixed(2)} ≈ {sessionsRemaining} sessions remaining
+                  ${balanceUSD.toFixed(2)} ≈ {sessionsRemaining} sessions remaining
                 </span>
               </div>
             )}

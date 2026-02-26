@@ -48,13 +48,18 @@ export default function App() {
       updateVariation(sess.id, variation.id, { status: 'pending', seed });
 
       try {
-        const { polling_url } = await startGeneration(
+        const { polling_url, cost } = await startGeneration(
           settings,
           sourceBase64,
           variation.config,
           seed
         );
-        updateVariation(sess.id, variation.id, { status: 'polling', pollingUrl: polling_url });
+        // cost is in credits (1 credit = $0.01 USD)
+        updateVariation(sess.id, variation.id, {
+          status: 'polling',
+          pollingUrl: polling_url,
+          cost: cost != null ? cost / 100 : undefined,
+        });
 
         let attempts = 0;
         while (attempts < 60) {
