@@ -28,7 +28,7 @@ export default function BatchDownload({ session }: Props) {
         id: v.id,
         label: `V${i + 1} · ${v.config.label}`,
         blobUrl: v.blobUrl!,
-        filename: `variation-${i + 1}-${v.config.category}.jpg`,
+        filename: `variation-${i + 1}.jpg`,
       })),
   ];
 

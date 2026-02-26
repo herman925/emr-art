@@ -1,11 +1,6 @@
-import type { VariationCategory } from '../types';
-
-/**
- * Static category definitions — label + category only.
- * Prompts are generated dynamically at runtime via buildPrompt() in prompt-builder.ts.
- */
-export const VARIATION_DEFINITIONS: { category: VariationCategory; label: string }[] = [
-  { category: 'safety',    label: 'Safety Sign Change' },
-  { category: 'equipment', label: 'Equipment Alteration' },
-  { category: 'props',     label: 'Prop Modification' },
+/** Three generic variation slots — prompts are built dynamically by prompt-builder.ts */
+export const VARIATION_DEFINITIONS: { label: string }[] = [
+  { label: 'Variation 1' },
+  { label: 'Variation 2' },
+  { label: 'Variation 3' },
 ];

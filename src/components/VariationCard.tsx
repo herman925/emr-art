@@ -8,12 +8,6 @@ interface Props {
   onRegenerate?: (id: string) => void;
 }
 
-const CATEGORY_COLORS: Record<string, string> = {
-  safety: 'bg-red-500/20 text-red-300 border-red-500/30',
-  equipment: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-  props: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-  environment: 'bg-green-500/20 text-green-300 border-green-500/30',
-};
 
 export default function VariationCard({ variation, index, onRegenerate }: Props) {
   const [showPrompt, setShowPrompt] = useState(false);
@@ -22,7 +16,7 @@ export default function VariationCard({ variation, index, onRegenerate }: Props)
     if (!variation.blobUrl) return;
     const a = document.createElement('a');
     a.href = variation.blobUrl;
-    a.download = `variation-${index + 1}-${variation.config.category}.jpg`;
+    a.download = `variation-${index + 1}.jpg`;
     a.click();
   };
 
@@ -61,10 +55,7 @@ export default function VariationCard({ variation, index, onRegenerate }: Props)
       <div className="p-3">
         <div className="flex items-center justify-between gap-2 mb-1">
           <span className="text-white text-sm font-medium truncate">
-            V{index + 1} · {variation.config.label}
-          </span>
-          <span className={`text-xs px-2 py-0.5 rounded-full border ${CATEGORY_COLORS[variation.config.category] ?? ''}`}>
-            {variation.config.category}
+            {variation.config.label}
           </span>
         </div>
 

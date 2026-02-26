@@ -26,8 +26,10 @@ export default {
     // Defaults to api.bfl.ai for all other requests.
     const requestedHost = request.headers.get('x-bfl-host') ?? 'api.bfl.ai';
 
-    // Security: only allow *.bfl.ai targets
-    if (!requestedHost.endsWith('.bfl.ai')) {
+    // Security: only allow BFL API hosts and BFL result delivery (Azure Blob)
+    const allowed = requestedHost.endsWith('.bfl.ai')
+      || requestedHost.endsWith('.blob.core.windows.net');
+    if (!allowed) {
       return new Response(JSON.stringify({ error: 'Invalid target host' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json', ...corsHeaders(request) },

@@ -45,10 +45,7 @@ export const MODEL_COST_USD: Record<BFLModel, number> = {
   'flux-2-klein-base-9b': 0.020,
 };
 
-export type VariationCategory = 'safety' | 'equipment' | 'props' | 'environment';
-
 export interface VariationConfig {
-  category: VariationCategory;
   label: string;
   prompt: string;
 }

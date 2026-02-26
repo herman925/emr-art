@@ -112,9 +112,8 @@ export default function App() {
       const variations: GeneratedVariation[] = VARIATION_DEFINITIONS.map((def) => ({
         id: generateId(),
         config: {
-          category: def.category,
           label: def.label,
-          prompt: buildPrompt(promptParams, def.category, settings.model),
+          prompt: buildPrompt(promptParams, settings.model),
         },
         status: 'idle',
       }));

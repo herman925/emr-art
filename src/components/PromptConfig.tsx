@@ -6,7 +6,6 @@ import type {
   ChangeIntensity,
   PhotoStyle,
 } from '../types';
-import { VARIATION_DEFINITIONS } from '../lib/variations';
 import { buildPromptPreview } from '../lib/prompt-builder';
 import type { BFLModel } from '../types';
 
@@ -162,17 +161,13 @@ export default function PromptConfig({ params, model, onChange }: Props) {
             </button>
 
             {showPreview && (
-              <div className="mt-3 space-y-3">
-                {VARIATION_DEFINITIONS.map((v) => (
-                  <div key={v.category}>
-                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                      {v.label}
-                    </p>
-                    <pre className="text-[10px] text-gray-300 bg-gray-900 border border-gray-700 rounded-lg p-3 whitespace-pre-wrap break-words leading-relaxed font-mono">
-                      {buildPromptPreview(params, v.category, model)}
-                    </pre>
-                  </div>
-                ))}
+              <div className="mt-3">
+                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                  Prompt sent to API (same for all 3 variations, different seeds)
+                </p>
+                <pre className="text-[10px] text-gray-300 bg-gray-900 border border-gray-700 rounded-lg p-3 whitespace-pre-wrap break-words leading-relaxed font-mono">
+                  {buildPromptPreview(params, model)}
+                </pre>
               </div>
             )}
           </div>

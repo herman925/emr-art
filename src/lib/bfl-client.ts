@@ -169,7 +169,15 @@ export async function pollResult(
 }
 
 export async function downloadImageAsBlob(url: string): Promise<string> {
-  const response = await fetch(url);
+  // The result image is on Azure Blob Storage (bfldelivery*.blob.core.windows.net)
+  // which also lacks CORS headers — route through our proxy the same way.
+  const target     = new URL(url);
+  const proxyBase  = BFL_BASE.replace(/\/v1\/?$/, '');
+  const proxiedUrl = proxyBase + target.pathname + target.search;
+
+  const response = await fetch(proxiedUrl, {
+    headers: { 'x-bfl-host': target.hostname },
+  });
   if (!response.ok) throw new Error('Failed to download image');
   const blob = await response.blob();
   return URL.createObjectURL(blob);
