@@ -55,14 +55,17 @@ export interface VariationConfig {
 
 // ── Dynamic prompt parameters ──────────────────────────────────────────────
 
+// ECE Hub corner/station types
 export type EnvironmentType =
-  | 'office'
-  | 'workshop'
-  | 'warehouse'
-  | 'lab'
-  | 'clinic'
-  | 'classroom'
-  | 'generic';
+  | 'general'        // General Hub common area
+  | 'art'            // Art & craft corner
+  | 'reading'        // Reading / library corner
+  | 'blocks'         // Blocks / construction corner
+  | 'dramatic-play'  // Dramatic play / home corner
+  | 'science'        // Science & discovery corner
+  | 'sensory'        // Sensory / sand & water play
+  | 'music'          // Music corner
+  | 'outdoor';       // Outdoor play area
 
 export type ChangeIntensity = 'subtle' | 'moderate' | 'obvious';
 

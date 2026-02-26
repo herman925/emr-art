@@ -16,14 +16,16 @@ interface Props {
   onChange: (p: PromptParams) => void;
 }
 
-const ENVIRONMENTS: { value: EnvironmentType; label: string }[] = [
-  { value: 'generic',   label: 'Generic' },
-  { value: 'office',    label: 'Office' },
-  { value: 'workshop',  label: 'Workshop' },
-  { value: 'warehouse', label: 'Warehouse' },
-  { value: 'lab',       label: 'Lab' },
-  { value: 'clinic',    label: 'Clinic' },
-  { value: 'classroom', label: 'Classroom' },
+const ENVIRONMENTS: { value: EnvironmentType; label: string; emoji: string }[] = [
+  { value: 'general',       label: 'General Hub',     emoji: '🏠' },
+  { value: 'art',           label: 'Art & Craft',     emoji: '🎨' },
+  { value: 'reading',       label: 'Reading',         emoji: '📚' },
+  { value: 'blocks',        label: 'Blocks',          emoji: '🧱' },
+  { value: 'dramatic-play', label: 'Dramatic Play',   emoji: '🎭' },
+  { value: 'science',       label: 'Science',         emoji: '🔬' },
+  { value: 'sensory',       label: 'Sensory Play',    emoji: '💧' },
+  { value: 'music',         label: 'Music',           emoji: '🎵' },
+  { value: 'outdoor',       label: 'Outdoor',         emoji: '🌳' },
 ];
 
 const INTENSITIES: { value: ChangeIntensity; label: string; desc: string }[] = [
@@ -97,7 +99,7 @@ export default function PromptConfig({ params, model, onChange }: Props) {
                       : 'bg-gray-700/50 border-gray-600 text-gray-400 hover:border-gray-500 hover:text-gray-300'
                   }`}
                 >
-                  {e.label}
+                  {e.emoji} {e.label}
                 </button>
               ))}
             </div>

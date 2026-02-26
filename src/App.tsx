@@ -29,7 +29,7 @@ export default function App() {
   const [view, setView] = useState<AppView>('upload');
   const [session, setSession] = useState<Session | null>(null);
   const [promptParams, setPromptParams] = useState<PromptParams>({
-    environment: 'generic',
+    environment: 'general',
     intensity: 'moderate',
     photoStyle: 'match-source',
   });
