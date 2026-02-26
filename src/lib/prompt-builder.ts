@@ -2,10 +2,17 @@
  * Dynamic prompt builder for EMR-ART
  *
  * Context: ECE (Early Childhood Education) Hubs — community centres for children
- * with themed corners/stations.
+ * with themed corners/stations (e.g. transport corner, dramatic play, art, etc.)
  *
- * Core principle: camera angle + spatial layout = LOCKED.
- * Objects, colours, items within the scene = CHANGEABLE.
+ * Target output: same room, same camera angle, same architectural features —
+ * but the corner SETUP inside the room looks meaningfully different.
+ * Think: a different educator re-dressed the same corner in the same room.
+ *
+ * Hard constraints on every prompt:
+ *   - No human beings or children ever appear
+ *   - Camera angle, focal length, framing — identical
+ *   - Room geometry (walls, ceiling, floor, windows, fixed structures) — identical
+ *   - Lighting direction and colour temperature — identical
  */
 
 import type { EnvironmentType, ChangeIntensity, PhotoStyle, PromptParams } from '../types';
@@ -31,65 +38,73 @@ const STYLE_DESCRIPTOR: Record<PhotoStyle, string> = {
   'indoor-fluorescent':  'indoor overhead lighting, crisp detail, high-fidelity early childhood environment documentation',
 };
 
-// What changes — expressed as assertive instructions, not vague descriptions.
-// The prompt explicitly separates LOCKED elements from CHANGEABLE elements.
+/**
+ * All five levels describe re-dressing the CORNER SETUP inside a fixed room.
+ * The room itself never changes. The question is how different the setup looks.
+ *
+ * Reference examples observed in real Hub samples:
+ *   - Original: rough DIY cardboard train covered in blue tarp
+ *   - Variation: same room/angle but train is now fully decorated, new wall maps,
+ *     floor markings added, different equipment beside it
+ * That gap is the target for the upper end of this scale.
+ */
 const INTENSITY_CHANGE: Record<ChangeIntensity, { label: string; instruction: string }> = {
   minimal: {
-    label: 'Minimal',
+    label: 'Noticeable',
     instruction:
-      'Change exactly ONE small detail anywhere in the scene — for example one object changes colour, one item is replaced with a slightly different version, or one small prop is missing. Everything else is pixel-perfect identical to the reference.',
+      'Keep the same corner setup and theme but change several visible details: alter the colours of key props, swap some decorations, add or remove a few items from shelves or surfaces. The overall setup looks recognisably similar but a careful observer notices clear differences.',
   },
   subtle: {
-    label: 'Subtle',
+    label: 'Significant',
     instruction:
-      'Change TWO or THREE small details in the scene — for example colours of specific objects shift, small props are swapped for different ones, or a minor item appears or disappears. Changes should require careful side-by-side comparison to notice.',
+      'The corner setup is visibly re-dressed: the main prop or installation has a noticeably different appearance (different colour scheme, different decorations, more or less elaborately finished), background shelves and wall displays have different contents, and some additional or removed equipment changes the overall arrangement. Same theme, but set up differently.',
   },
   moderate: {
-    label: 'Moderate',
+    label: 'Dramatic',
     instruction:
-      'Make FOUR to SIX visible changes throughout the scene — replace objects with different ones, change colours of prominent items, add or remove recognisable props, alter the appearance of a feature (e.g. the style or colour of a toy, a mat, or a storage unit). Changes should be clearly noticeable on inspection.',
+      'The corner looks like it was completely rebuilt or re-decorated by a different person. The main installation or props have a substantially different visual style, finish, and colour palette. Wall displays, floor markings, and surrounding equipment are all different. The corner theme may be the same broad category but everything about its physical presentation is new.',
   },
   obvious: {
-    label: 'Obvious',
+    label: 'Extreme',
     instruction:
-      'Make MANY prominent, immediately noticeable changes throughout the scene — objects are replaced with completely different ones, colours of large features change dramatically, items are added or removed, the appearance of key elements (furniture, toys, equipment, signage, wall displays) is clearly different. A viewer should spot several differences at a glance.',
+      'The corner has been entirely reimagined. While the room structure and camera angle are identical, the corner setup inside looks completely different — different theme or sub-theme, different props, different colours, different layout of furniture and equipment within the space. Like a fully different corner activity station has been installed in the same room.',
   },
   major: {
-    label: 'Major',
+    label: 'Total',
     instruction:
-      'Transform the scene significantly — dramatically change the colours, contents, and appearance of most elements in the space. Replace, remove, or alter toys, furniture, wall displays, floor coverings, storage units, and props throughout. The scene should look like the same room photographed from the same angle but with a very different setup or theme applied to it.',
+      'Completely replace everything inside the room with a totally different activity corner setup. Different theme, different furniture, different props, different wall decorations, different floor use. Only the room shell (walls, ceiling, floor surface, windows) and exact camera angle remain. The interior should be unrecognisable compared to the reference.',
   },
 };
 
+const HARD_RULES = [
+  'No human beings, children, or people of any kind appear anywhere in the image — the scene is empty of people',
+  'Camera angle, focal length, perspective, and framing — absolutely identical to the reference image',
+  'Room geometry: walls, ceiling, floor surface, windows, doors, fixed structural features — identical to the reference image',
+  'Lighting direction, light sources, colour temperature, and shadows — identical to the reference image',
+];
+
 export function buildPrompt(params: PromptParams, model: BFLModel): string {
-  const envLabel   = ENV_LABEL[params.environment];
+  const envLabel      = ENV_LABEL[params.environment];
   const { instruction } = INTENSITY_CHANGE[params.intensity];
-  const styleDesc  = STYLE_DESCRIPTOR[params.photoStyle];
-  const sceneNote  = params.sceneDescription.trim()
+  const styleDesc     = STYLE_DESCRIPTOR[params.photoStyle];
+  const sceneNote     = params.sceneDescription.trim()
     ? `The reference image shows: ${params.sceneDescription.trim()}.`
     : '';
 
   if (isKleinModel(model)) {
     return [
-      `Photorealistic photograph of a ${envLabel}.`,
+      `Photorealistic photograph of a ${envLabel}. No people.`,
       sceneNote,
-      `LOCKED — must be absolutely identical to the reference: camera angle, focal length, framing, perspective, spatial layout, room structure, walls, floor, ceiling, and all fixed architectural features.`,
-      `CHANGEABLE — apply the following modifications: ${instruction}`,
-      `${styleDesc}.`,
-      `Output must be indistinguishable from a real photograph.`,
+      `LOCKED — camera angle, lighting, room shell: identical to reference.`,
+      `CHANGE the corner setup: ${instruction}`,
+      `${styleDesc}. No humans in the image.`,
     ].filter(Boolean).join(' ');
   }
 
   return JSON.stringify({
     scene: `Photorealistic photograph of a ${envLabel}, based on the provided reference image${sceneNote ? '. ' + sceneNote : ''}`,
-    LOCKED_must_be_identical: [
-      'Camera angle, focal length, perspective, and framing — absolutely identical',
-      'Spatial layout of the room — identical',
-      'Walls, floor, ceiling, windows, doors, and all fixed architectural features — identical',
-      'Lighting direction, colour temperature, and shadows — identical',
-      'Depth of field and exposure — identical',
-    ],
-    CHANGEABLE_apply_these_modifications: instruction,
+    hard_rules: HARD_RULES,
+    change_the_corner_setup: instruction,
     style: `Professional early childhood environment photography — ${styleDesc}`,
     output_quality: 'Ultra-high fidelity photorealism, indistinguishable from a real photograph',
   });
@@ -97,22 +112,16 @@ export function buildPrompt(params: PromptParams, model: BFLModel): string {
 
 export function buildPromptPreview(params: PromptParams, model: BFLModel): string {
   if (isKleinModel(model)) return buildPrompt(params, model);
-  const envLabel   = ENV_LABEL[params.environment];
+  const envLabel      = ENV_LABEL[params.environment];
   const { instruction } = INTENSITY_CHANGE[params.intensity];
-  const styleDesc  = STYLE_DESCRIPTOR[params.photoStyle];
-  const sceneNote  = params.sceneDescription.trim()
+  const styleDesc     = STYLE_DESCRIPTOR[params.photoStyle];
+  const sceneNote     = params.sceneDescription.trim()
     ? `The reference image shows: ${params.sceneDescription.trim()}.`
     : '';
   return JSON.stringify({
     scene: `Photorealistic photograph of a ${envLabel}, based on the provided reference image${sceneNote ? '. ' + sceneNote : ''}`,
-    LOCKED_must_be_identical: [
-      'Camera angle, focal length, perspective, and framing — absolutely identical',
-      'Spatial layout of the room — identical',
-      'Walls, floor, ceiling, windows, doors, and all fixed architectural features — identical',
-      'Lighting direction, colour temperature, and shadows — identical',
-      'Depth of field and exposure — identical',
-    ],
-    CHANGEABLE_apply_these_modifications: instruction,
+    hard_rules: HARD_RULES,
+    change_the_corner_setup: instruction,
     style: `Professional early childhood environment photography — ${styleDesc}`,
     output_quality: 'Ultra-high fidelity photorealism, indistinguishable from a real photograph',
   }, null, 2);
