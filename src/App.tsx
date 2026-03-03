@@ -329,18 +329,22 @@ export default function App() {
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
 
       {/* Header */}
-      <header className="border-b border-gray-800 px-6 py-4 shrink-0">
-        <div className="max-w-screen-xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-600 rounded-lg">
-              <Layers size={18} />
+      <header className="border-b border-gray-800 px-4 sm:px-6 py-3 sm:py-4 shrink-0">
+        <div className="max-w-screen-xl mx-auto flex items-center justify-between gap-2 min-w-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="p-1.5 sm:p-2 bg-indigo-600 rounded-lg shrink-0">
+              <Layers size={16} className="sm:hidden" />
+              <Layers size={18} className="hidden sm:block" />
             </div>
-            <div>
-              <h1 className="text-lg font-bold text-white leading-none">Event-Based Memory Test</h1>
-              <p className="text-xs text-gray-400 mt-0.5">AI Art Generation System</p>
+            <div className="min-w-0">
+              <h1 className="text-sm sm:text-lg font-bold text-white leading-none truncate">
+                <span className="hidden sm:inline">Event-Based Memory Test</span>
+                <span className="sm:hidden">EMR Art</span>
+              </h1>
+              <p className="text-xs text-gray-400 mt-0.5 hidden sm:block">AI Art Generation System</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               onClick={toggleTheme}
               className="p-2 rounded-lg text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 transition-colors"
@@ -350,10 +354,10 @@ export default function App() {
             </button>
             <button
               onClick={() => setShowExport(true)}
-              className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"
+              className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-white px-2 sm:px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"
             >
               <Package size={15} />
-              Export
+              <span className="hidden sm:inline">Export</span>
             </button>
             <button
               onClick={() => setShowSettings(true)}

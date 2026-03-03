@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Eye, EyeOff, Wand2, Plus, Minus } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, EyeOff, Wand2, Plus, Minus, Info } from 'lucide-react';
 import type { PromptParams, EnvironmentType, ChangeIntensity, PhotoStyle } from '../types';
 import { buildPromptPreview, INTENSITY_META } from '../lib/prompt-builder';
 import { MODEL_COST_USD } from '../types';
@@ -153,7 +153,15 @@ export default function PromptConfig({ params, model, onChange, intensityDist, o
                     <span className={`text-sm flex-1 font-medium ${count > 0 ? 'text-white' : 'text-gray-400'}`}>
                       {meta.label}
                     </span>
-                    <p className="text-[10px] text-gray-600 hidden sm:block w-32 truncate">{meta.instruction}</p>
+                    <div className="relative group shrink-0">
+                      <Info size={13} className="text-gray-500 hover:text-gray-300 cursor-pointer transition-colors" />
+                      <div className="absolute right-0 bottom-full mb-1.5 z-50 hidden group-hover:block w-48 pointer-events-none">
+                        <div className="bg-gray-900 dark:bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 shadow-xl">
+                          <p className="text-xs text-gray-100 leading-snug">{meta.instruction}</p>
+                        </div>
+                        <div className="absolute right-1.5 top-full -mt-px border-4 border-transparent border-t-gray-600" />
+                      </div>
+                    </div>
                     {/* Stepper */}
                     <div className="flex items-center gap-1 shrink-0">
                       <button
