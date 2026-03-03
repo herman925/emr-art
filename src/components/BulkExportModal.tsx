@@ -77,17 +77,17 @@ export default function BulkExportModal({ onClose }: Props) {
 
       for (let si = 0; si < filtered.length; si++) {
         const sess = filtered[si];
-        const folderName = sess.sourceImageName.replace(/\.[^.]+$/, '') + `_${sess.id.slice(0, 6)}`;
-        const folder = zip.folder(folderName)!;
+        const baseName = sess.sourceImageName.replace(/\.[^.]+$/, '');
 
         setProgress(`Fetching job ${si + 1} / ${filtered.length}…`);
 
         if (includeOriginals) {
           const srcUrl = sess.sourceImageUrl;
           if (srcUrl) {
+            const ext = sess.sourceImageName.match(/\.[^.]+$/)?.[0] ?? '.jpg';
             const res = await fetch(srcUrl);
             const blob = await res.blob();
-            folder.file(`original-${sess.sourceImageName}`, blob);
+            zip.file(`${baseName}${ext}`, blob);
           }
         }
 
@@ -97,7 +97,7 @@ export default function BulkExportModal({ onClose }: Props) {
           if (!blobUrl) continue;
           const res = await fetch(blobUrl);
           const blob = await res.blob();
-          folder.file(`variation-${vi + 1}.jpg`, blob);
+          zip.file(`${baseName}_v${vi + 1}.jpg`, blob);
         }
       }
 

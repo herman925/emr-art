@@ -15,12 +15,15 @@ interface Props {
 }
 
 export default function BatchDownload({ session }: Props) {
+  const baseName = session.sourceImageName.replace(/\.[^.]+$/, '');
+  const sourceExt = session.sourceImageName.match(/\.[^.]+$/)?.[0] ?? '.jpg';
+
   const allImages: ImageEntry[] = [
     {
       id: 'original',
       label: 'Original',
       blobUrl: session.sourceImageUrl,
-      filename: `original-${session.sourceImageName}`,
+      filename: `${baseName}${sourceExt}`,
     },
     ...session.variations
       .filter((v) => v.status === 'done' && v.blobUrl)
@@ -28,7 +31,7 @@ export default function BatchDownload({ session }: Props) {
         id: v.id,
         label: `V${i + 1} · ${v.config.label}`,
         blobUrl: v.blobUrl!,
-        filename: `variation-${i + 1}.jpg`,
+        filename: `${baseName}_v${i + 1}.jpg`,
       })),
   ];
 
@@ -77,13 +80,12 @@ export default function BatchDownload({ session }: Props) {
       const sessionDate = new Date(session.createdAt)
         .toISOString()
         .slice(0, 10);
-      const folder = zip.folder(`emr-art-${sessionDate}`)!;
 
       await Promise.all(
         toDownload.map(async (img) => {
           const response = await fetch(img.blobUrl);
           const blob = await response.blob();
-          folder.file(img.filename, blob);
+          zip.file(img.filename, blob);
         })
       );
 
