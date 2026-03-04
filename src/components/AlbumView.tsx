@@ -10,7 +10,7 @@ interface Props {
   onRate: (sessionId: string, variationId: string, rating: number | undefined) => void;
 }
 
-type FlagFilter   = 'all' | 'accepted' | 'rejected' | 'unreviewed';
+type FlagFilter   = 'all' | 'accepted' | 'rejected' | 'unreviewed' | 'not-downloaded';
 type StarOperator = '>'  | '>=' | '=' | '<=' | '<';
 type GroupBy      = 'none' | 'source' | 'environment' | 'intensity' | 'flag' | 'stars';
 
@@ -160,9 +160,10 @@ export default function AlbumView({ sessions, onFlag, onRate }: Props) {
       // Search
       if (search && !session.sourceImageName.toLowerCase().includes(search.toLowerCase())) return false;
       // Flag
-      if (filters.flag === 'accepted'   && variation.flag !== 'accepted')  return false;
-      if (filters.flag === 'rejected'   && variation.flag !== 'rejected')  return false;
-      if (filters.flag === 'unreviewed' && variation.flag != null)          return false;
+      if (filters.flag === 'accepted'      && variation.flag !== 'accepted')  return false;
+      if (filters.flag === 'rejected'      && variation.flag !== 'rejected')  return false;
+      if (filters.flag === 'unreviewed'    && variation.flag != null)          return false;
+      if (filters.flag === 'not-downloaded' && variation.downloaded === true)  return false;
       if (!matchesStar(variation.rating, filters.starOp, filters.starValue)) return false;
       const p = session.promptParams;
       if (filters.environment !== 'all' && p?.environment !== filters.environment) return false;
@@ -300,10 +301,11 @@ export default function AlbumView({ sessions, onFlag, onRate }: Props) {
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Review Status</p>
               <div className="flex flex-wrap gap-1.5">
                 {([
-                  { v: 'all',        label: 'All'         },
-                  { v: 'accepted',   label: '✓ Accepted'  },
-                  { v: 'rejected',   label: '👎 Rejected'  },
-                  { v: 'unreviewed', label: '— Unreviewed' },
+                  { v: 'all',            label: 'All'             },
+                  { v: 'accepted',       label: '✓ Accepted'      },
+                  { v: 'rejected',       label: '👎 Rejected'      },
+                  { v: 'unreviewed',     label: '— Unreviewed'    },
+                  { v: 'not-downloaded', label: '⬇ Not exported'  },
                 ] as { v: FlagFilter; label: string }[]).map((opt) => (
                   <button key={opt.v} onClick={() => set('flag', opt.v)}
                     className={`px-3 py-1.5 rounded-lg border text-sm transition-colors ${

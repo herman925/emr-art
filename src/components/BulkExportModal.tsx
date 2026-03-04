@@ -1,21 +1,22 @@
 import { useState, useEffect, useMemo } from 'react';
 import JSZip from 'jszip';
-import { X, Download, Star, Check, ThumbsDown, Package, Filter } from 'lucide-react';
+import { X, Download, Star, Check, ThumbsDown, Package, Filter, FileDown } from 'lucide-react';
 // Star is used in the star-filter buttons below
 import type { Session } from '../types';
 import { loadSessions, loadImageBlobUrl, loadSourceBlobUrl } from '../lib/storage';
 
 interface Props {
   onClose: () => void;
+  onMarkDownloaded: (ids: { sessionId: string; variationId: string }[]) => void;
 }
 
-type FlagFilter = 'all' | 'accepted' | 'rejected' | 'unreviewed';
+type FlagFilter = 'all' | 'accepted' | 'rejected' | 'unreviewed' | 'not-downloaded';
 
 interface SessionWithBlobs extends Session {
   sourceImageUrl: string; // resolved blob URL
 }
 
-export default function BulkExportModal({ onClose }: Props) {
+export default function BulkExportModal({ onClose, onMarkDownloaded }: Props) {
   const [sessions, setSessions] = useState<SessionWithBlobs[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -50,9 +51,10 @@ export default function BulkExportModal({ onClose }: Props) {
       .map((sess) => {
         const matchingVariations = sess.variations.filter((v) => {
           if (v.status !== 'done') return false;
-          if (flagFilter === 'accepted'   && v.flag !== 'accepted')  return false;
-          if (flagFilter === 'rejected'   && v.flag !== 'rejected')  return false;
-          if (flagFilter === 'unreviewed' && v.flag != null)          return false;
+          if (flagFilter === 'accepted'      && v.flag !== 'accepted')  return false;
+          if (flagFilter === 'rejected'      && v.flag !== 'rejected')  return false;
+          if (flagFilter === 'unreviewed'    && v.flag != null)          return false;
+          if (flagFilter === 'not-downloaded' && v.downloaded === true)  return false;
           if (minStars > 0 && (!v.rating || v.rating < minStars))    return false;
           return true;
         });
@@ -112,6 +114,12 @@ export default function BulkExportModal({ onClose }: Props) {
       a.download = `emr-art-export-${new Date().toISOString().slice(0, 10)}.zip`;
       a.click();
       URL.revokeObjectURL(url);
+
+      // Mark all exported variations as downloaded in persistent state
+      const downloadedIds = filtered.flatMap((sess) =>
+        sess.variations.map((v) => ({ sessionId: sess.id, variationId: v.id }))
+      );
+      onMarkDownloaded(downloadedIds);
     } finally {
       setDownloading(false);
       setProgress('');
@@ -128,7 +136,7 @@ export default function BulkExportModal({ onClose }: Props) {
             <Package size={18} className="text-indigo-400" />
             <h2 className="text-base font-bold text-white">Bulk Export</h2>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
+          <button type="button" onClick={onClose} title="Close" className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
             <X size={17} />
           </button>
         </div>
@@ -145,12 +153,14 @@ export default function BulkExportModal({ onClose }: Props) {
             <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Review status</p>
             <div className="flex gap-2">
               {([
-                { value: 'all',        label: 'All jobs',   icon: null },
-                { value: 'accepted',   label: 'Accepted',   icon: <Check size={12} className="text-green-400" /> },
-                { value: 'rejected',   label: 'Rejected',   icon: <ThumbsDown size={12} className="text-red-400" /> },
-                { value: 'unreviewed', label: 'Unreviewed', icon: null },
+                { value: 'all',            label: 'All',           icon: null },
+                { value: 'accepted',       label: 'Accepted',      icon: <Check size={12} className="text-green-400" /> },
+                { value: 'rejected',       label: 'Rejected',      icon: <ThumbsDown size={12} className="text-red-400" /> },
+                { value: 'unreviewed',     label: 'Unreviewed',    icon: null },
+                { value: 'not-downloaded', label: 'Not exported',  icon: <FileDown size={12} className="text-amber-400" /> },
               ] as { value: FlagFilter; label: string; icon: React.ReactNode }[]).map((opt) => (
                 <button
+                  type="button"
                   key={opt.value}
                   onClick={() => setFlagFilter(opt.value)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition-colors ${
@@ -179,6 +189,7 @@ export default function BulkExportModal({ onClose }: Props) {
                 { value: 5, label: '5' },
               ].map((opt) => (
                 <button
+                  type="button"
                   key={opt.value}
                   onClick={() => setMinStars(opt.value)}
                   className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border text-sm transition-colors ${
@@ -242,6 +253,11 @@ export default function BulkExportModal({ onClose }: Props) {
                             <ThumbsDown size={10} /> {sess.variations.filter((v) => v.flag === 'rejected').length} rejected
                           </span>
                         )}
+                        {sess.variations.some((v) => v.downloaded) && (
+                          <span className="flex items-center gap-1 text-xs text-amber-400">
+                            <FileDown size={10} /> {sess.variations.filter((v) => v.downloaded).length} exported
+                          </span>
+                        )}
                       </div>
                     </div>
                     <span className="text-xs text-gray-500 shrink-0">
@@ -268,6 +284,7 @@ export default function BulkExportModal({ onClose }: Props) {
               )}
             </div>
             <button
+              type="button"
               onClick={handleDownload}
               disabled={filtered.length === 0 || downloading}
               className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-sm font-semibold transition-colors"

@@ -306,6 +306,27 @@ export default function App() {
     applyAndSave(prevSessions, setPrevSessions);
   }, [activeSessions, prevSessions]);
 
+  // ── Mark variations as downloaded ────────────────────────────────────────
+  const handleMarkDownloaded = useCallback((ids: { sessionId: string; variationId: string }[]) => {
+    const idSet = new Map<string, Set<string>>();
+    for (const { sessionId, variationId } of ids) {
+      if (!idSet.has(sessionId)) idSet.set(sessionId, new Set());
+      idSet.get(sessionId)!.add(variationId);
+    }
+    const applyAndSave = (list: Session[], setter: React.Dispatch<React.SetStateAction<Session[]>>) => {
+      const updated = list.map((sess) => {
+        const vids = idSet.get(sess.id);
+        if (!vids) return sess;
+        const next = { ...sess, variations: sess.variations.map((v) => vids.has(v.id) ? { ...v, downloaded: true } : v) };
+        saveSession(next);
+        return next;
+      });
+      setter(updated);
+    };
+    applyAndSave(activeSessions, setActiveSessions);
+    applyAndSave(prevSessions, setPrevSessions);
+  }, [activeSessions, prevSessions]);
+
   // ── Remove job ───────────────────────────────────────────────────────────
   const handleRemoveActive = useCallback((sessionId: string) => {
     setActiveSessions((prev) => prev.filter((s) => s.id !== sessionId));
@@ -524,7 +545,7 @@ export default function App() {
         <SettingsModal settings={settings} onSave={updateSettings} onClose={() => setShowSettings(false)} />
       )}
       {showExport && (
-        <BulkExportModal onClose={() => setShowExport(false)} />
+        <BulkExportModal onClose={() => setShowExport(false)} onMarkDownloaded={handleMarkDownloaded} />
       )}
     </div>
   );

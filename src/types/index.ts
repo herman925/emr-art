@@ -105,6 +105,7 @@ export interface GeneratedVariation {
   cost?: number;
   flag?: VariationFlag;  // per-variation review state
   rating?: number;       // 1–5 stars; undefined = unrated
+  downloaded?: boolean;  // true once included in a ZIP export
 }
 
 export type VariationFlag = 'accepted' | 'rejected';
