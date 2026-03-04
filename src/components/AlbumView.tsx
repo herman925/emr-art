@@ -140,6 +140,42 @@ export default function AlbumView({ sessions, onFlag, onRate, onMarkDownloaded }
   const [groupBy, setGroupBy] = useState<GroupBy>('none');
   const [showGroupMenu, setShowGroupMenu] = useState(false);
 
+  const set = <K extends keyof Filters>(key: K, val: Filters[K]) =>
+    setFilters((f) => ({ ...f, [key]: val }));
+
+  // Build unfiltered flat list
+  const allItems = useMemo<AlbumItem[]>(() => {
+    const items: AlbumItem[] = [];
+    let idx = 0;
+    for (const session of sessions) {
+      for (const variation of session.variations) {
+        if (variation.status === 'done' && variation.blobUrl) {
+          items.push({ session, variation, globalIndex: idx++ });
+        }
+      }
+    }
+    return items;
+  }, [sessions]);
+
+  // Apply filters + search
+  const albumItems = useMemo<AlbumItem[]>(() => {
+    return allItems.filter(({ session, variation }) => {
+      // Search
+      if (search && !session.sourceImageName.toLowerCase().includes(search.toLowerCase())) return false;
+      // Flag
+      if (filters.flag === 'accepted'      && variation.flag !== 'accepted')  return false;
+      if (filters.flag === 'rejected'      && variation.flag !== 'rejected')  return false;
+      if (filters.flag === 'unreviewed'    && variation.flag != null)          return false;
+      if (filters.flag === 'not-downloaded' && variation.downloaded === true)  return false;
+      if (!matchesStar(variation.rating, filters.starOp, filters.starValue)) return false;
+      const p = session.promptParams;
+      if (filters.environment !== 'all' && p?.environment !== filters.environment) return false;
+      if (filters.intensity   !== 'all' && p?.intensity   !== filters.intensity)   return false;
+      if (filters.photoStyle  !== 'all' && p?.photoStyle  !== filters.photoStyle)  return false;
+      return true;
+    });
+  }, [allItems, filters, search]);
+
   // ── Select mode ────────────────────────────────────────────────────────
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -196,42 +232,6 @@ export default function AlbumView({ sessions, onFlag, onRate, onMarkDownloaded }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [albumItems, selected, onMarkDownloaded]);
-
-  const set = <K extends keyof Filters>(key: K, val: Filters[K]) =>
-    setFilters((f) => ({ ...f, [key]: val }));
-
-  // Build unfiltered flat list
-  const allItems = useMemo<AlbumItem[]>(() => {
-    const items: AlbumItem[] = [];
-    let idx = 0;
-    for (const session of sessions) {
-      for (const variation of session.variations) {
-        if (variation.status === 'done' && variation.blobUrl) {
-          items.push({ session, variation, globalIndex: idx++ });
-        }
-      }
-    }
-    return items;
-  }, [sessions]);
-
-  // Apply filters + search
-  const albumItems = useMemo<AlbumItem[]>(() => {
-    return allItems.filter(({ session, variation }) => {
-      // Search
-      if (search && !session.sourceImageName.toLowerCase().includes(search.toLowerCase())) return false;
-      // Flag
-      if (filters.flag === 'accepted'      && variation.flag !== 'accepted')  return false;
-      if (filters.flag === 'rejected'      && variation.flag !== 'rejected')  return false;
-      if (filters.flag === 'unreviewed'    && variation.flag != null)          return false;
-      if (filters.flag === 'not-downloaded' && variation.downloaded === true)  return false;
-      if (!matchesStar(variation.rating, filters.starOp, filters.starValue)) return false;
-      const p = session.promptParams;
-      if (filters.environment !== 'all' && p?.environment !== filters.environment) return false;
-      if (filters.intensity   !== 'all' && p?.intensity   !== filters.intensity)   return false;
-      if (filters.photoStyle  !== 'all' && p?.photoStyle  !== filters.photoStyle)  return false;
-      return true;
-    });
-  }, [allItems, filters, search]);
 
   const groups = useMemo(() => groupItems(albumItems, groupBy), [albumItems, groupBy]);
 
