@@ -1,6 +1,8 @@
-import { useState, useMemo } from 'react';
-import { Check, ThumbsDown, Star, Images, SlidersHorizontal, X, Search, Group, FileDown } from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
+import JSZip from 'jszip';
+import { Check, ThumbsDown, Star, Images, SlidersHorizontal, X, Search, Group, FileDown, MousePointerSquareDashed, Download } from 'lucide-react';
 import type { Session, VariationFlag, EnvironmentType, ChangeIntensity, PhotoStyle } from '../types';
+import { loadImageBlobUrl } from '../lib/storage';
 import AlbumLightbox, { type AlbumItem } from './AlbumLightbox';
 import { INTENSITY_META, ENV_DISPLAY } from '../lib/prompt-builder';
 
@@ -138,6 +140,63 @@ export default function AlbumView({ sessions, onFlag, onRate, onMarkDownloaded }
   const [groupBy, setGroupBy] = useState<GroupBy>('none');
   const [showGroupMenu, setShowGroupMenu] = useState(false);
 
+  // ── Select mode ────────────────────────────────────────────────────────
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [exporting, setExporting] = useState(false);
+
+  const toggleSelectMode = useCallback(() => {
+    setSelectMode((v) => !v);
+    setSelected(new Set());
+  }, []);
+
+  const toggleItem = useCallback((id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const selectAll = useCallback(() => {
+    setSelected(new Set(albumItems.map((i) => i.variation.id)));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [albumItems]);
+
+  const handleExportSelected = useCallback(async () => {
+    const toExport = albumItems.filter((i) => selected.has(i.variation.id));
+    if (toExport.length === 0) return;
+    setExporting(true);
+    try {
+      const zip = new JSZip();
+      const exported: { sessionId: string; variationId: string }[] = [];
+      for (const { session, variation } of toExport) {
+        const baseName = session.sourceImageName.replace(/\.[^.]+$/, '');
+        // figure out variation index relative to its session in the filtered list
+        const sessionVariations = toExport.filter((i) => i.session.id === session.id);
+        const vi = sessionVariations.indexOf(toExport.find((i) => i.variation.id === variation.id)!);
+        const blobUrl = await loadImageBlobUrl(variation.id) ?? variation.blobUrl;
+        if (!blobUrl) continue;
+        const res = await fetch(blobUrl);
+        const blob = await res.blob();
+        zip.file(`${baseName}_v${vi + 1}.jpg`, blob);
+        exported.push({ sessionId: session.id, variationId: variation.id });
+      }
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `emr-art-export-${new Date().toISOString().slice(0, 10)}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      onMarkDownloaded(exported);
+      setSelected(new Set());
+    } finally {
+      setExporting(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [albumItems, selected, onMarkDownloaded]);
+
   const set = <K extends keyof Filters>(key: K, val: Filters[K]) =>
     setFilters((f) => ({ ...f, [key]: val }));
 
@@ -267,6 +326,39 @@ export default function AlbumView({ sessions, onFlag, onRate, onMarkDownloaded }
               </div>
             )}
           </div>
+
+          <button
+            type="button"
+            onClick={toggleSelectMode}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition-colors ${
+              selectMode
+                ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300'
+                : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600 hover:text-white'
+            }`}
+          >
+            <MousePointerSquareDashed size={13} />
+            {selectMode ? (selected.size > 0 ? `${selected.size} selected` : 'Selecting…') : 'Select'}
+          </button>
+
+          {selectMode && (
+            <>
+              <button
+                type="button"
+                onClick={selectAll}
+                className="text-xs text-gray-500 hover:text-white transition-colors"
+              >
+                All
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelected(new Set())}
+                disabled={selected.size === 0}
+                className="text-xs text-gray-500 hover:text-white disabled:opacity-30 transition-colors"
+              >
+                None
+              </button>
+            </>
+          )}
 
           {(activeFilterCount > 0 || search) && (
             <button
@@ -455,24 +547,40 @@ export default function AlbumView({ sessions, onFlag, onRate, onMarkDownloaded }
                   const { variation, session } = item;
                   // Find index in flat albumItems for lightbox navigation
                   const flatIdx = albumItems.indexOf(item);
+                  const isSelected = selected.has(variation.id);
                   return (
                     <button
+                      type="button"
                       key={variation.id}
-                      onClick={() => setLightboxIndex(flatIdx)}
-                      className="group relative aspect-video bg-gray-900 rounded-xl overflow-hidden border border-gray-700 hover:border-indigo-500/60 transition-all hover:shadow-lg hover:shadow-indigo-900/20"
+                      onClick={() => selectMode ? toggleItem(variation.id) : setLightboxIndex(flatIdx)}
+                      className={`group relative aspect-video bg-gray-900 rounded-xl overflow-hidden border transition-all ${
+                        selectMode && isSelected
+                          ? 'border-indigo-500 ring-2 ring-indigo-500/40'
+                          : 'border-gray-700 hover:border-indigo-500/60 hover:shadow-lg hover:shadow-indigo-900/20'
+                      }`}
                     >
                       <img
                         src={variation.blobUrl!}
                         alt={variation.config.label}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        className={`w-full h-full object-cover transition-transform duration-300 ${!selectMode ? 'group-hover:scale-105' : ''}`}
                         draggable={false}
                       />
+                      {/* Select mode checkbox overlay */}
+                      {selectMode && (
+                        <div className={`absolute inset-0 transition-colors ${isSelected ? 'bg-indigo-600/20' : 'bg-black/10 group-hover:bg-black/30'}`}>
+                          <div className={`absolute top-2 left-2 w-5 h-5 rounded flex items-center justify-center border-2 transition-colors ${
+                            isSelected ? 'bg-indigo-500 border-indigo-400' : 'bg-black/40 border-white/50'
+                          }`}>
+                            {isSelected && <Check size={11} className="text-white" />}
+                          </div>
+                        </div>
+                      )}
                       {/* Source thumbnail */}
                       <div className="absolute bottom-2 left-2 w-9 h-9 rounded-lg overflow-hidden border-2 border-white/30 shadow-lg bg-gray-900">
                         <img src={session.sourceImageUrl} alt="" className="w-full h-full object-cover" draggable={false} />
                       </div>
                       {/* Flag badge */}
-                      {variation.flag && (
+                      {!selectMode && variation.flag && (
                         <div className={`absolute top-2 left-2 w-5 h-5 rounded-full flex items-center justify-center shadow ${
                           variation.flag === 'accepted' ? 'bg-green-500' : 'bg-red-500'
                         }`}>
@@ -496,19 +604,47 @@ export default function AlbumView({ sessions, onFlag, onRate, onMarkDownloaded }
                           <span className="text-[9px] text-amber-400 font-bold">exported</span>
                         </div>
                       )}
-                      {/* Hover label */}
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-end p-2">
-                        <div className="opacity-0 group-hover:opacity-100 transition-opacity text-left">
-                          <p className="text-xs font-medium text-white drop-shadow">{variation.config.label}</p>
-                          <p className="text-[10px] text-gray-300 truncate max-w-35 drop-shadow">{session.sourceImageName}</p>
+                      {/* Hover label (normal mode only) */}
+                      {!selectMode && (
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-end p-2">
+                          <div className="opacity-0 group-hover:opacity-100 transition-opacity text-left">
+                            <p className="text-xs font-medium text-white drop-shadow">{variation.config.label}</p>
+                            <p className="text-[10px] text-gray-300 truncate max-w-35 drop-shadow">{session.sourceImageName}</p>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </button>
                   );
                 })}
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Sticky export bar */}
+      {selectMode && selected.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 px-4 py-3 bg-gray-900 border border-indigo-500/60 rounded-2xl shadow-2xl shadow-black/60">
+          <span className="text-sm text-gray-300 font-medium">{selected.size} selected</span>
+          <button
+            type="button"
+            onClick={handleExportSelected}
+            disabled={exporting}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-semibold transition-colors"
+          >
+            {exporting
+              ? <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              : <Download size={14} />}
+            {exporting ? 'Exporting…' : 'Export ZIP'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelected(new Set())}
+            title="Clear selection"
+            className="p-2 text-gray-500 hover:text-white transition-colors"
+          >
+            <X size={14} />
+          </button>
         </div>
       )}
 
