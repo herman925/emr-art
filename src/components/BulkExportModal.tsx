@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import JSZip from 'jszip';
-import { X, Download, Star, Check, ThumbsDown, Package, Filter, FileDown } from 'lucide-react';
+import { X, Download, Star, Check, ThumbsDown, Package, Filter, FileDown, ChevronDown, ChevronRight } from 'lucide-react';
 // Star is used in the star-filter buttons below
 import type { Session } from '../types';
 import { loadSessions, loadImageBlobUrl, loadSourceBlobUrl } from '../lib/storage';
@@ -28,6 +28,8 @@ export default function BulkExportModal({ onClose, onMarkDownloaded }: Props) {
   // Download state
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState('');
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
 
   // Load all sessions + resolve source blob URLs
   useEffect(() => {
@@ -68,6 +70,39 @@ export default function BulkExportModal({ onClose, onMarkDownloaded }: Props) {
     0
   );
   const totalPhotos = totalVariations + (includeOriginals ? filtered.length : 0);
+
+  const toggleSession = useCallback((sessId: string) => {
+    setExpandedSessions((prev) => {
+      const next = new Set(prev);
+      if (next.has(sessId)) next.delete(sessId); else next.add(sessId);
+      return next;
+    });
+  }, []);
+
+  const handleDownloadOne = useCallback(async (
+    sessId: string,
+    variationId: string,
+    baseName: string,
+    varIndex: number,
+  ) => {
+    if (downloadingId) return;
+    setDownloadingId(variationId);
+    try {
+      const blobUrl = await loadImageBlobUrl(variationId);
+      if (!blobUrl) return;
+      const res = await fetch(blobUrl);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${baseName}_v${varIndex + 1}.jpg`;
+      a.click();
+      URL.revokeObjectURL(url);
+      onMarkDownloaded([{ sessionId: sessId, variationId }]);
+    } finally {
+      setDownloadingId(null);
+    }
+  }, [downloadingId, onMarkDownloaded]);
 
   const handleDownload = async () => {
     if (filtered.length === 0) return;
@@ -233,36 +268,84 @@ export default function BulkExportModal({ onClose, onMarkDownloaded }: Props) {
           ) : (
             <div className="space-y-2">
               {filtered.map((sess) => {
-                const doneCount = sess.variations.length; // already filtered to matching variations
+                const doneCount = sess.variations.length;
+                const baseName = sess.sourceImageName.replace(/\.[^.]+$/, '');
+                const isExpanded = expandedSessions.has(sess.id);
                 return (
-                  <div key={sess.id} className="flex items-center gap-3 p-2.5 bg-gray-800/60 border border-gray-700 rounded-xl">
-                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-700 shrink-0">
-                      <img src={sess.sourceImageUrl} alt="" className="w-full h-full object-cover" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{sess.sourceImageName}</p>
-                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        <span className="text-xs text-gray-500">{doneCount} variation{doneCount !== 1 ? 's' : ''}</span>
-                        {sess.variations.some((v) => v.flag === 'accepted') && (
-                          <span className="flex items-center gap-1 text-xs text-green-400">
-                            <Check size={10} /> {sess.variations.filter((v) => v.flag === 'accepted').length} accepted
-                          </span>
-                        )}
-                        {sess.variations.some((v) => v.flag === 'rejected') && (
-                          <span className="flex items-center gap-1 text-xs text-red-400">
-                            <ThumbsDown size={10} /> {sess.variations.filter((v) => v.flag === 'rejected').length} rejected
-                          </span>
-                        )}
-                        {sess.variations.some((v) => v.downloaded) && (
-                          <span className="flex items-center gap-1 text-xs text-amber-400">
-                            <FileDown size={10} /> {sess.variations.filter((v) => v.downloaded).length} exported
-                          </span>
-                        )}
+                  <div key={sess.id} className="bg-gray-800/60 border border-gray-700 rounded-xl overflow-hidden">
+                    {/* Session header row — click to expand */}
+                    <button
+                      type="button"
+                      onClick={() => toggleSession(sess.id)}
+                      className="w-full flex items-center gap-3 p-2.5 hover:bg-gray-700/40 transition-colors text-left"
+                    >
+                      {isExpanded
+                        ? <ChevronDown size={14} className="text-gray-500 shrink-0" />
+                        : <ChevronRight size={14} className="text-gray-500 shrink-0" />}
+                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-700 shrink-0">
+                        <img src={sess.sourceImageUrl} alt="" className="w-full h-full object-cover" />
                       </div>
-                    </div>
-                    <span className="text-xs text-gray-500 shrink-0">
-                      {doneCount + (includeOriginals ? 1 : 0)} file{(doneCount + (includeOriginals ? 1 : 0)) !== 1 ? 's' : ''}
-                    </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-white truncate">{sess.sourceImageName}</p>
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                          <span className="text-xs text-gray-500">{doneCount} variation{doneCount !== 1 ? 's' : ''}</span>
+                          {sess.variations.some((v) => v.flag === 'accepted') && (
+                            <span className="flex items-center gap-1 text-xs text-green-400">
+                              <Check size={10} /> {sess.variations.filter((v) => v.flag === 'accepted').length} accepted
+                            </span>
+                          )}
+                          {sess.variations.some((v) => v.flag === 'rejected') && (
+                            <span className="flex items-center gap-1 text-xs text-red-400">
+                              <ThumbsDown size={10} /> {sess.variations.filter((v) => v.flag === 'rejected').length} rejected
+                            </span>
+                          )}
+                          {sess.variations.some((v) => v.downloaded) && (
+                            <span className="flex items-center gap-1 text-xs text-amber-400">
+                              <FileDown size={10} /> {sess.variations.filter((v) => v.downloaded).length} exported
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-xs text-gray-500 shrink-0">
+                        {doneCount + (includeOriginals ? 1 : 0)} file{(doneCount + (includeOriginals ? 1 : 0)) !== 1 ? 's' : ''}
+                      </span>
+                    </button>
+
+                    {/* Expanded variation list */}
+                    {isExpanded && (
+                      <div className="border-t border-gray-700 divide-y divide-gray-700/60">
+                        {sess.variations.map((v, vi) => {
+                          const isLoading = downloadingId === v.id;
+                          return (
+                            <div key={v.id} className="flex items-center gap-2.5 px-3 py-2">
+                              <div className="w-9 h-9 rounded-md overflow-hidden bg-gray-700 shrink-0">
+                                {v.blobUrl && <img src={v.blobUrl} alt="" className="w-full h-full object-cover" />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-gray-300 truncate">
+                                  {baseName}_v{vi + 1}.jpg
+                                </p>
+                                <p className="text-[10px] text-gray-500 truncate">{v.config.label}</p>
+                              </div>
+                              {v.downloaded && (
+                                <span className="text-[10px] text-amber-400/80 shrink-0">exported</span>
+                              )}
+                              <button
+                                type="button"
+                                title={`Download ${baseName}_v${vi + 1}.jpg`}
+                                disabled={!!downloadingId}
+                                onClick={() => handleDownloadOne(sess.id, v.id, baseName, vi)}
+                                className="shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                              >
+                                {isLoading
+                                  ? <span className="block w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                                  : <Download size={13} />}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               })}
