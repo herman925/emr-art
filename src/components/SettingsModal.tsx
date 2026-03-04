@@ -173,7 +173,7 @@ export default function SettingsModal({ settings, onSave, onClose }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-700">
           <h2 className="text-lg font-semibold text-white">Settings</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+          <button title="Close" onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
             <X size={20} />
           </button>
         </div>
@@ -352,6 +352,7 @@ export default function SettingsModal({ settings, onSave, onClose }: Props) {
                   <p className="text-xs text-gray-500 mt-0.5">Auto-enriches prompt via Mistral (recommended)</p>
                 </div>
                 <button
+                  title="Toggle prompt upsampling"
                   onClick={() => setForm({ ...form, promptUpsampling: !(form.promptUpsampling ?? true) })}
                   className={`relative w-10 h-5 rounded-full transition-colors ${
                     (form.promptUpsampling ?? true) ? 'bg-indigo-600' : 'bg-gray-600'
@@ -373,6 +374,7 @@ export default function SettingsModal({ settings, onSave, onClose }: Props) {
                 </div>
                 <input
                   type="range"
+                  title="Guidance strength"
                   min={1.5}
                   max={10}
                   step={0.5}
@@ -394,6 +396,7 @@ export default function SettingsModal({ settings, onSave, onClose }: Props) {
                 </div>
                 <input
                   type="range"
+                  title="Number of diffusion steps"
                   min={1}
                   max={50}
                   step={1}

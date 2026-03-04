@@ -115,7 +115,7 @@ export default function PromptConfig({ params, model, onChange, intensityDist, o
             </span>
           )}
           {params.sceneDescription && (
-            <span className="text-xs px-2.5 py-1 rounded-full bg-gray-800 border border-gray-700 text-gray-400 max-w-[180px] truncate">
+            <span className="text-xs px-2.5 py-1 rounded-full bg-gray-800 border border-gray-700 text-gray-400 max-w-45 truncate">
               "{params.sceneDescription}"
             </span>
           )}
@@ -165,6 +165,7 @@ export default function PromptConfig({ params, model, onChange, intensityDist, o
                     {/* Stepper */}
                     <div className="flex items-center gap-1 shrink-0">
                       <button
+                        title={`Decrease ${meta.label} count`}
                         onClick={() => setCount(intensity, -1)}
                         disabled={count === 0}
                         className="w-6 h-6 rounded flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
@@ -176,10 +177,12 @@ export default function PromptConfig({ params, model, onChange, intensityDist, o
                         min={0}
                         max={MAX_PER_INTENSITY}
                         value={count}
+                        title={`${meta.label} variation count`}
                         onChange={(e) => setCount(intensity, 'set', parseInt(e.target.value) || 0)}
                         className="w-10 text-center text-sm font-mono font-semibold bg-gray-900 border border-gray-600 rounded text-white focus:outline-none focus:border-indigo-500 py-0.5"
                       />
                       <button
+                        title={`Increase ${meta.label} count`}
                         onClick={() => setCount(intensity, +1)}
                         disabled={atCap}
                         className="w-6 h-6 rounded flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
@@ -214,6 +217,7 @@ export default function PromptConfig({ params, model, onChange, intensityDist, o
             </label>
             <div className="relative">
               <select
+                title="Environment type"
                 value={params.environment}
                 onChange={(e) => onChange({ ...params, environment: e.target.value as EnvironmentType })}
                 className="w-full appearance-none bg-gray-900 border border-gray-600 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
@@ -286,7 +290,7 @@ export default function PromptConfig({ params, model, onChange, intensityDist, o
                   .map(([intensity, meta]) => (
                     <div key={intensity}>
                       <p className="text-[10px] text-gray-500 mb-1">{meta.icon} {meta.label}</p>
-                      <pre className="text-[11px] text-gray-300 bg-gray-900 border border-gray-700 rounded-lg p-3 whitespace-pre-wrap break-words leading-relaxed font-mono max-h-32 overflow-y-auto">
+                      <pre className="text-[11px] text-gray-300 bg-gray-900 border border-gray-700 rounded-lg p-3 whitespace-pre-wrap wrap-break-word leading-relaxed font-mono max-h-32 overflow-y-auto">
                         {buildPromptPreview({ ...params, intensity }, model)}
                       </pre>
                     </div>

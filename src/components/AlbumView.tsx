@@ -208,6 +208,7 @@ export default function AlbumView({ sessions, onFlag, onRate, onMarkDownloaded }
           />
           {search && (
             <button
+              title="Clear search"
               onClick={() => setSearch('')}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
             >
@@ -249,7 +250,7 @@ export default function AlbumView({ sessions, onFlag, onRate, onMarkDownloaded }
               {groupBy !== 'none' ? activeGroupBy.label : 'Group By'}
             </button>
             {showGroupMenu && (
-              <div className="absolute top-full mt-1 left-0 z-20 bg-gray-900 border border-gray-700 rounded-xl shadow-xl py-1 min-w-[160px]">
+              <div className="absolute top-full mt-1 left-0 z-20 bg-gray-900 border border-gray-700 rounded-xl shadow-xl py-1 min-w-40">
                 {GROUP_BY_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
@@ -499,7 +500,7 @@ export default function AlbumView({ sessions, onFlag, onRate, onMarkDownloaded }
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-end p-2">
                         <div className="opacity-0 group-hover:opacity-100 transition-opacity text-left">
                           <p className="text-xs font-medium text-white drop-shadow">{variation.config.label}</p>
-                          <p className="text-[10px] text-gray-300 truncate max-w-[140px] drop-shadow">{session.sourceImageName}</p>
+                          <p className="text-[10px] text-gray-300 truncate max-w-35 drop-shadow">{session.sourceImageName}</p>
                         </div>
                       </div>
                     </button>

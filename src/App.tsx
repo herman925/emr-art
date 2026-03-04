@@ -351,7 +351,7 @@ export default function App() {
 
       {/* Header */}
       <header className="border-b border-gray-800 px-4 sm:px-6 py-3 sm:py-4 shrink-0">
-        <div className="max-w-screen-xl mx-auto flex items-center justify-between gap-2 min-w-0">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 min-w-0">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <div className="p-1.5 sm:p-2 bg-indigo-600 rounded-lg shrink-0">
               <Layers size={16} className="sm:hidden" />
@@ -396,7 +396,7 @@ export default function App() {
       </header>
 
       {/* Two-panel body */}
-      <div className="flex-1 flex overflow-hidden max-w-screen-xl mx-auto w-full">
+      <div className="flex-1 flex overflow-hidden max-w-7xl mx-auto w-full">
 
         {/* ── Left panel: upload + config ── */}
         <aside className="w-96 shrink-0 border-r border-gray-800 flex flex-col overflow-y-auto">
