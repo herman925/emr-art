@@ -307,7 +307,7 @@ export default function App() {
   }, [activeSessions, prevSessions]);
 
   // ── Mark variations as downloaded ────────────────────────────────────────
-  const handleMarkDownloaded = useCallback((ids: { sessionId: string; variationId: string }[]) => {
+  const handleMarkDownloaded = useCallback((ids: { sessionId: string; variationId: string }[], value = true) => {
     const idSet = new Map<string, Set<string>>();
     for (const { sessionId, variationId } of ids) {
       if (!idSet.has(sessionId)) idSet.set(sessionId, new Set());
@@ -317,7 +317,7 @@ export default function App() {
       const updated = list.map((sess) => {
         const vids = idSet.get(sess.id);
         if (!vids) return sess;
-        const next = { ...sess, variations: sess.variations.map((v) => vids.has(v.id) ? { ...v, downloaded: true } : v) };
+        const next = { ...sess, variations: sess.variations.map((v) => vids.has(v.id) ? { ...v, downloaded: value } : v) };
         saveSession(next);
         return next;
       });
@@ -535,6 +535,7 @@ export default function App() {
                 sessions={allSessions}
                 onFlag={handleFlagVariation}
                 onRate={handleRateVariation}
+                onMarkDownloaded={handleMarkDownloaded}
               />
             )}
           </div>

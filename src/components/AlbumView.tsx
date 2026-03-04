@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Check, ThumbsDown, Star, Images, SlidersHorizontal, X, Search, Group } from 'lucide-react';
+import { Check, ThumbsDown, Star, Images, SlidersHorizontal, X, Search, Group, FileDown } from 'lucide-react';
 import type { Session, VariationFlag, EnvironmentType, ChangeIntensity, PhotoStyle } from '../types';
 import AlbumLightbox, { type AlbumItem } from './AlbumLightbox';
 import { INTENSITY_META, ENV_DISPLAY } from '../lib/prompt-builder';
@@ -8,6 +8,7 @@ interface Props {
   sessions: Session[];
   onFlag: (sessionId: string, variationId: string, flag: VariationFlag | undefined) => void;
   onRate: (sessionId: string, variationId: string, rating: number | undefined) => void;
+  onMarkDownloaded: (ids: { sessionId: string; variationId: string }[], value?: boolean) => void;
 }
 
 type FlagFilter   = 'all' | 'accepted' | 'rejected' | 'unreviewed' | 'not-downloaded';
@@ -128,7 +129,7 @@ function groupItems(items: AlbumItem[], groupBy: GroupBy): { label: string; item
   return entries;
 }
 
-export default function AlbumView({ sessions, onFlag, onRate }: Props) {
+export default function AlbumView({ sessions, onFlag, onRate, onMarkDownloaded }: Props) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
@@ -487,6 +488,13 @@ export default function AlbumView({ sessions, onFlag, onRate }: Props) {
                           <span className="text-[9px] text-amber-300 font-bold">{variation.rating}</span>
                         </div>
                       )}
+                      {/* Exported badge */}
+                      {variation.downloaded && (
+                        <div className="absolute bottom-2 right-2 flex items-center gap-0.5 bg-amber-500/20 border border-amber-500/40 backdrop-blur-sm px-1.5 py-0.5 rounded-full">
+                          <FileDown size={9} className="text-amber-400" />
+                          <span className="text-[9px] text-amber-400 font-bold">exported</span>
+                        </div>
+                      )}
                       {/* Hover label */}
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-end p-2">
                         <div className="opacity-0 group-hover:opacity-100 transition-opacity text-left">
@@ -510,6 +518,7 @@ export default function AlbumView({ sessions, onFlag, onRate }: Props) {
           onNavigate={setLightboxIndex}
           onFlag={onFlag}
           onRate={onRate}
+          onMarkDownloaded={onMarkDownloaded}
           onClose={() => setLightboxIndex(null)}
         />
       )}

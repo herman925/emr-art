@@ -7,7 +7,7 @@ import { loadSessions, loadImageBlobUrl, loadSourceBlobUrl } from '../lib/storag
 
 interface Props {
   onClose: () => void;
-  onMarkDownloaded: (ids: { sessionId: string; variationId: string }[]) => void;
+  onMarkDownloaded: (ids: { sessionId: string; variationId: string }[], value?: boolean) => void;
 }
 
 type FlagFilter = 'all' | 'accepted' | 'rejected' | 'unreviewed' | 'not-downloaded';

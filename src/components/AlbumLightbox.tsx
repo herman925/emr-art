@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useState } from 'react';
-import { X, ChevronLeft, ChevronRight, Check, ThumbsDown, Star } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Check, ThumbsDown, Star, FileDown } from 'lucide-react';
 import type { Session, GeneratedVariation, VariationFlag } from '../types';
 import { INTENSITY_META, ENV_DISPLAY } from '../lib/prompt-builder';
 
@@ -15,6 +15,7 @@ interface Props {
   onNavigate: (index: number) => void;
   onFlag: (sessionId: string, variationId: string, flag: VariationFlag | undefined) => void;
   onRate: (sessionId: string, variationId: string, rating: number | undefined) => void;
+  onMarkDownloaded: (ids: { sessionId: string; variationId: string }[], value?: boolean) => void;
   onClose: () => void;
 }
 
@@ -46,7 +47,7 @@ function StarRow({
   );
 }
 
-export default function AlbumLightbox({ items, currentIndex, onNavigate, onFlag, onRate, onClose }: Props) {
+export default function AlbumLightbox({ items, currentIndex, onNavigate, onFlag, onRate, onMarkDownloaded, onClose }: Props) {
   const item = items[currentIndex];
   const [dimensions, setDimensions] = useState<{ w: number; h: number } | null>(null);
 
@@ -70,6 +71,10 @@ export default function AlbumLightbox({ items, currentIndex, onNavigate, onFlag,
   const toggleFlag = useCallback((flag: VariationFlag) => {
     onFlag(session.id, variation.id, variation.flag === flag ? undefined : flag);
   }, [session.id, variation.id, variation.flag, onFlag]);
+
+  const toggleDownloaded = useCallback(() => {
+    onMarkDownloaded([{ sessionId: session.id, variationId: variation.id }], !variation.downloaded);
+  }, [session.id, variation.id, variation.downloaded, onMarkDownloaded]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -225,6 +230,20 @@ export default function AlbumLightbox({ items, currentIndex, onNavigate, onFlag,
             {/* Review */}
             <div>
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Review</p>
+
+              <button
+                type="button"
+                onClick={toggleDownloaded}
+                title="Toggle exported status"
+                className={`w-full flex items-center justify-center gap-2 py-2 mb-3 rounded-xl border text-sm font-semibold transition-colors ${
+                  variation.downloaded
+                    ? 'bg-amber-500/15 border-amber-600 text-amber-400'
+                    : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-amber-700 hover:text-amber-400'
+                }`}
+              >
+                <FileDown size={14} />
+                {variation.downloaded ? 'Exported ✓' : 'Mark as exported'}
+              </button>
 
               <div className="flex gap-2 mb-4">
                 <button
