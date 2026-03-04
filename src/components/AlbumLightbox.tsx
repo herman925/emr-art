@@ -49,16 +49,13 @@ function StarRow({
 
 export default function AlbumLightbox({ items, currentIndex, onNavigate, onFlag, onRate, onMarkDownloaded, onClose }: Props) {
   const item = items[currentIndex];
-  const [dimensions, setDimensions] = useState<{ w: number; h: number } | null>(null);
-
-  // Reset dimensions when navigating to a new image
-  useEffect(() => { setDimensions(null); }, [currentIndex]);
-
-  if (!item) return null;
-
-  const { session, variation } = item;
-  const params = session.promptParams;
+  const { session, variation } = item ?? {};
+  const params = session?.promptParams;
   const total = items.length;
+
+  const [dimensions, setDimensions] = useState<{ index: number; w: number; h: number } | null>(null);
+  // Auto-resets when navigating without a setState-in-effect
+  const effectiveDimensions = dimensions?.index === currentIndex ? dimensions : null;
 
   const goPrev = useCallback(() => {
     if (currentIndex > 0) onNavigate(currentIndex - 1);
@@ -69,15 +66,18 @@ export default function AlbumLightbox({ items, currentIndex, onNavigate, onFlag,
   }, [currentIndex, total, onNavigate]);
 
   const toggleFlag = useCallback((flag: VariationFlag) => {
+    if (!session || !variation) return;
     onFlag(session.id, variation.id, variation.flag === flag ? undefined : flag);
-  }, [session.id, variation.id, variation.flag, onFlag]);
+  }, [session, variation, onFlag]);
 
   const toggleDownloaded = useCallback(() => {
+    if (!session || !variation) return;
     onMarkDownloaded([{ sessionId: session.id, variationId: variation.id }], !variation.downloaded);
-  }, [session.id, variation.id, variation.downloaded, onMarkDownloaded]);
+  }, [session, variation, onMarkDownloaded]);
 
   // Keyboard navigation
   useEffect(() => {
+    if (!session || !variation) return;
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       switch (e.key) {
@@ -95,7 +95,9 @@ export default function AlbumLightbox({ items, currentIndex, onNavigate, onFlag,
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [goPrev, goNext, toggleFlag, onClose, onRate, session.id, variation.id, variation.rating]);
+  }, [goPrev, goNext, toggleFlag, onClose, onRate, session, variation]);
+
+  if (!item) return null;
 
   const envInfo = params?.environment ? ENV_DISPLAY[params.environment] : null;
   const intensityInfo = params?.intensity ? INTENSITY_META[params.intensity] : null;
@@ -136,7 +138,7 @@ export default function AlbumLightbox({ items, currentIndex, onNavigate, onFlag,
             <span>[1–5] Stars</span>
             <span>[←/→] Navigate</span>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
+          <button onClick={onClose} title="Close" className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
             <X size={18} />
           </button>
         </div>
@@ -155,7 +157,7 @@ export default function AlbumLightbox({ items, currentIndex, onNavigate, onFlag,
             draggable={false}
             onLoad={(e) => {
               const img = e.currentTarget;
-              setDimensions({ w: img.naturalWidth, h: img.naturalHeight });
+              setDimensions({ index: currentIndex, w: img.naturalWidth, h: img.naturalHeight });
             }}
           />
         </div>
@@ -179,11 +181,11 @@ export default function AlbumLightbox({ items, currentIndex, onNavigate, onFlag,
             </div>
 
             {/* Dimensions */}
-            {dimensions && (
+            {effectiveDimensions && (
               <div className="px-3 py-2 bg-gray-800 rounded-lg flex items-center justify-between">
                 <p className="text-xs text-gray-500">Dimensions</p>
                 <p className="text-sm font-medium text-white font-mono tabular-nums">
-                  {dimensions.w} × {dimensions.h}
+                  {effectiveDimensions.w} × {effectiveDimensions.h}
                 </p>
               </div>
             )}
