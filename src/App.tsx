@@ -1,12 +1,11 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Settings, Layers, Package, LayoutGrid, List, Sun, Moon } from 'lucide-react';
+import { Settings, Layers, LayoutGrid, List, Sun, Moon } from 'lucide-react';
 import { useSettings } from './hooks/useSettings';
 import { useTheme } from './hooks/useTheme';
 import SettingsModal from './components/SettingsModal';
 import PhotoUploader from './components/PhotoUploader';
 import JobAccordion from './components/JobAccordion';
 import AlbumView from './components/AlbumView';
-import BulkExportModal from './components/BulkExportModal';
 import {
   startGeneration,
   pollResult,
@@ -91,7 +90,6 @@ export default function App() {
   const { settings, updateSettings, loaded } = useSettings();
   const { theme, toggle: toggleTheme } = useTheme();
   const [showSettings, setShowSettings] = useState(false);
-  const [showExport, setShowExport]     = useState(false);
   const [rightView, setRightView]       = useState<RightView>('jobs');
 
   // Active jobs (current session, lost on page refresh)
@@ -373,13 +371,7 @@ export default function App() {
             >
               {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
             </button>
-            <button
-              onClick={() => setShowExport(true)}
-              className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-white px-2 sm:px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"
-            >
-              <Package size={15} />
-              <span className="hidden sm:inline">Export</span>
-            </button>
+
             <button
               onClick={() => setShowSettings(true)}
               className={`p-2 rounded-lg transition-colors ${
@@ -544,9 +536,6 @@ export default function App() {
 
       {showSettings && (
         <SettingsModal settings={settings} onSave={updateSettings} onClose={() => setShowSettings(false)} />
-      )}
-      {showExport && (
-        <BulkExportModal onClose={() => setShowExport(false)} onMarkDownloaded={handleMarkDownloaded} />
       )}
     </div>
   );
