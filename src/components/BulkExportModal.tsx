@@ -95,7 +95,7 @@ export default function BulkExportModal({ onClose, onMarkDownloaded }: Props) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${baseName}_v${varIndex + 1}.jpg`;
+      a.download = `${baseName}_${String.fromCharCode(98 + varIndex)}.jpg`;
       a.click();
       URL.revokeObjectURL(url);
       onMarkDownloaded([{ sessionId: sessId, variationId }]);
@@ -134,7 +134,7 @@ export default function BulkExportModal({ onClose, onMarkDownloaded }: Props) {
           if (!blobUrl) continue;
           const res = await fetch(blobUrl);
           const blob = await res.blob();
-          zip.file(`${baseName}_v${vi + 1}.jpg`, blob);
+          zip.file(`${baseName}_${String.fromCharCode(98 + vi)}.jpg`, blob);
         }
       }
 
@@ -323,7 +323,7 @@ export default function BulkExportModal({ onClose, onMarkDownloaded }: Props) {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="text-xs font-medium text-gray-300 truncate">
-                                  {baseName}_v{vi + 1}.jpg
+                                  {baseName}_{String.fromCharCode(98 + vi)}.jpg
                                 </p>
                                 <p className="text-[10px] text-gray-500 truncate">{v.config.label}</p>
                               </div>
@@ -332,7 +332,7 @@ export default function BulkExportModal({ onClose, onMarkDownloaded }: Props) {
                               )}
                               <button
                                 type="button"
-                                title={`Download ${baseName}_v${vi + 1}.jpg`}
+                                title={`Download ${baseName}_${String.fromCharCode(98 + vi)}.jpg`}
                                 disabled={!!downloadingId}
                                 onClick={() => handleDownloadOne(sess.id, v.id, baseName, vi)}
                                 className="shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"

@@ -215,7 +215,7 @@ export default function AlbumView({ sessions, onFlag, onRate, onMarkDownloaded }
         if (!blobUrl) continue;
         const res = await fetch(blobUrl);
         const blob = await res.blob();
-        zip.file(`${baseName}_v${vi + 1}.jpg`, blob);
+        zip.file(`${baseName}_${String.fromCharCode(98 + vi)}.jpg`, blob);
         exported.push({ sessionId: session.id, variationId: variation.id });
       }
       const zipBlob = await zip.generateAsync({ type: 'blob' });
@@ -345,17 +345,18 @@ export default function AlbumView({ sessions, onFlag, onRate, onMarkDownloaded }
               <button
                 type="button"
                 onClick={selectAll}
-                className="text-xs text-gray-500 hover:text-white transition-colors"
+                disabled={selected.size === albumItems.length}
+                className="px-2.5 py-1.5 rounded-lg border text-xs border-gray-700 bg-gray-800 text-gray-300 hover:border-gray-500 hover:text-white disabled:opacity-30 transition-colors"
               >
-                All
+                Select all
               </button>
               <button
                 type="button"
                 onClick={() => setSelected(new Set())}
                 disabled={selected.size === 0}
-                className="text-xs text-gray-500 hover:text-white disabled:opacity-30 transition-colors"
+                className="px-2.5 py-1.5 rounded-lg border text-xs border-gray-700 bg-gray-800 text-gray-300 hover:border-gray-500 hover:text-white disabled:opacity-30 transition-colors"
               >
-                None
+                Deselect all
               </button>
             </>
           )}

@@ -29,9 +29,9 @@ export default function BatchDownload({ session }: Props) {
       .filter((v) => v.status === 'done' && v.blobUrl)
       .map((v, i) => ({
         id: v.id,
-        label: `V${i + 1} · ${v.config.label}`,
+        label: `${String.fromCharCode(98 + i).toUpperCase()} · ${v.config.label}`,
         blobUrl: v.blobUrl!,
-        filename: `${baseName}_v${i + 1}.jpg`,
+        filename: `${baseName}_${String.fromCharCode(98 + i)}.jpg`,
       })),
   ];
 
